@@ -1,0 +1,84 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile data",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "territoryColor": { "type": "string" },
+        "totalDistance": { "type": "number" },
+        "territoryStrength": { "type": "number" },
+        "lastActive": { "type": "timestamp" },
+        "wins": { "type": "number" },
+        "losses": { "type": "number" }
+      },
+      "required": ["uid", "displayName", "email", "territoryColor", "totalDistance", "territoryStrength", "lastActive", "wins", "losses"]
+    },
+    "Territory": {
+      "title": "Territory",
+      "description": "A user's claimed territory polygon",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "coordinates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "lat": { "type": "number" },
+              "lng": { "type": "number" }
+            },
+            "required": ["lat", "lng"]
+          }
+        },
+        "strength": { "type": "number" },
+        "lastUpdated": { "type": "timestamp" },
+        "areaKm2": { "type": "number" }
+      },
+      "required": ["uid", "coordinates", "strength", "lastUpdated", "areaKm2"]
+    },
+    "Session": {
+      "title": "Session",
+      "description": "A recorded running/walking session",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "startTime": { "type": "timestamp" },
+        "endTime": { "type": "timestamp" },
+        "distanceCovered": { "type": "number" },
+        "coordinatesTrail": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "lat": { "type": "number" },
+              "lng": { "type": "number" },
+              "timestamp": { "type": "number" }
+            },
+            "required": ["lat", "lng", "timestamp"]
+          }
+        },
+        "territoryGained": { "type": "number" },
+        "territoryLost": { "type": "number" }
+      },
+      "required": ["uid", "startTime", "endTime", "distanceCovered", "coordinatesTrail", "territoryGained", "territoryLost"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/User" },
+      "description": "User profiles"
+    },
+    "/territories/{userId}": {
+      "schema": { "$ref": "#/entities/Territory" },
+      "description": "User territories"
+    },
+    "/sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/Session" },
+      "description": "User sessions"
+    }
+  }
+}

@@ -1,0 +1,216 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+@import "leaflet/dist/leaflet.css";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+
+  --color-bg-dark: #080B12;
+  --color-bg-surface: #0D1117;
+  --color-bg-card: rgba(255, 255, 255, 0.04);
+
+  --color-glass-light: rgba(255, 255, 255, 0.08);
+  --color-glass-medium: rgba(255, 255, 255, 0.12);
+  --color-glass-heavy: rgba(255, 255, 255, 0.18);
+  --color-glass-border: rgba(255, 255, 255, 0.10);
+  --color-glass-border-bright: rgba(255, 255, 255, 0.22);
+
+  --color-neon-primary: #00E5FF;
+  --color-neon-secondary: #7B2FFF;
+  --color-neon-accent: #FF3CAC;
+  --color-neon-success: #00FF88;
+  --color-neon-warning: #FFB800;
+
+  --color-text-primary: #F0F4FF;
+  --color-text-secondary: rgba(240, 244, 255, 0.55);
+  --color-text-tertiary: rgba(240, 244, 255, 0.30);
+  --color-text-disabled: rgba(240, 244, 255, 0.18);
+}
+
+:root {
+  --bg-color: #080B12;
+  --text-color: #F0F4FF;
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  @apply antialiased selection:bg-neon-primary/30 transition-colors duration-500;
+}
+
+@layer utilities {
+  .glass-card-base {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 20px;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      0 1px 0 rgba(255, 255, 255, 0.08) inset,
+      0 -1px 0 rgba(0, 0, 0, 0.3) inset;
+  }
+
+  .glass-card-elevated {
+    background: rgba(255, 255, 255, 0.10);
+    border: 1px solid rgba(255, 255, 255, 0.16);
+    border-radius: 24px;
+    backdrop-filter: blur(40px) saturate(200%);
+    -webkit-backdrop-filter: blur(40px) saturate(200%);
+    box-shadow:
+      0 24px 64px rgba(0, 0, 0, 0.6),
+      0 1px 0 rgba(255, 255, 255, 0.14) inset;
+  }
+
+  .glass-card-neon {
+    background: rgba(0, 229, 255, 0.08);
+    border: 1px solid rgba(0, 229, 255, 0.25);
+    border-radius: 16px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+      0 0 20px rgba(0, 229, 255, 0.15),
+      0 0 60px rgba(0, 229, 255, 0.05),
+      0 1px 0 rgba(0, 229, 255, 0.20) inset;
+  }
+
+  .liquid-button {
+    background: linear-gradient(
+      135deg,
+      rgba(0, 229, 255, 0.20) 0%,
+      rgba(123, 47, 255, 0.15) 100%
+    );
+    border: 1px solid rgba(0, 229, 255, 0.30);
+    border-radius: 14px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow:
+      0 0 24px rgba(0, 229, 255, 0.20),
+      0 4px 16px rgba(0, 0, 0, 0.30),
+      0 1px 0 rgba(255, 255, 255, 0.15) inset;
+    padding: 14px 28px;
+  }
+
+  .glass-panel {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 20px;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      0 1px 0 rgba(255, 255, 255, 0.08) inset,
+      0 -1px 0 rgba(0, 0, 0, 0.3) inset;
+  }
+  .glass-button {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 20px;
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    box-shadow:
+      0 8px 32px rgba(0, 0, 0, 0.4),
+      0 1px 0 rgba(255, 255, 255, 0.08) inset,
+      0 -1px 0 rgba(0, 0, 0, 0.3) inset;
+    transition: all 300ms;
+  }
+  .glass-button:hover {
+    background: rgba(255, 255, 255, 0.12);
+  }
+  .text-glow {
+    text-shadow: 0 0 20px currentColor;
+  }
+  .territory-pulse {
+    animation: territory-pulse 3s infinite alternate ease-in-out;
+  }
+  .territory-pulse-fast {
+    animation: territory-pulse 1.5s infinite alternate ease-in-out;
+  }
+  .territory-pulse-slow {
+    animation: territory-pulse 4.5s infinite alternate ease-in-out;
+  }
+  .territory-label {
+    background: rgba(13, 17, 23, 0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    border-radius: 9999px;
+    padding: 2px 8px 2px 2px;
+    font-size: 10px;
+    font-weight: 700;
+    color: #F0F4FF;
+    white-space: nowrap;
+    text-align: center;
+    transform: translate(-50%, -50%);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+}
+
+@keyframes territory-pulse {
+  0% {
+    stroke-opacity: 0.4;
+    stroke-width: 2px;
+  }
+  100% {
+    stroke-opacity: 1;
+    stroke-width: 4px;
+  }
+}
+
+body {
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  @apply antialiased selection:bg-emerald-500/30 transition-colors duration-500;
+}
+
+/* Leaflet Controls Customization */
+.leaflet-bar {
+  border: 1px solid var(--color-glass-border) !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+
+.leaflet-bar a {
+  background-color: var(--color-glass-light) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: var(--color-text-primary) !important;
+  border-bottom: 1px solid var(--color-glass-border) !important;
+  width: 40px !important;
+  height: 40px !important;
+  line-height: 40px !important;
+  transition: all 300ms;
+}
+
+.leaflet-bar a:hover {
+  background-color: var(--color-glass-medium) !important;
+}
+
+.leaflet-bar a:last-child {
+  border-bottom: none !important;
+}
+
+.leaflet-control-zoom {
+  margin-bottom: 180px !important; /* Push up above the bottom bar */
+  margin-left: 20px !important;
+}
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-glass-border);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-glass-border-bright);
+}

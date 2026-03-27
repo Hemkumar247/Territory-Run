@@ -1,0 +1,7 @@
+{
+  "name": "Territory Run",
+  "description": "A location-based running game where users claim territory by running around it.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}

@@ -21,7 +21,7 @@ export function Leaderboard({ users, onClose }: LeaderboardProps) {
           <div className="bg-teal-500/10 p-2.5 rounded-2xl border border-teal-500/20 shadow-[0_0_15px_rgba(20,184,166,0.15)]">
             <Trophy className="h-5 w-5 text-teal-600 dark:text-teal-400" />
           </div>
-          <NeonText className="text-2xl font-display font-bold tracking-tight" color="#14b8a6">
+          <NeonText className="text-2xl font-display font-bold tracking-tight text-teal-600 dark:text-teal-400" color="currentColor">
             Global Ranking
           </NeonText>
         </div>

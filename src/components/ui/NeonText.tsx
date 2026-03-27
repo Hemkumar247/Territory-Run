@@ -15,10 +15,10 @@ export const NeonText = React.forwardRef<HTMLSpanElement, NeonTextProps>(
     if (intensity === 'high') blurRadius = '30px';
 
     const glowStyle = glow ? {
-      textShadow: `0 0 ${blurRadius} ${color}`,
-      color: color,
+      textShadow: `0 0 ${blurRadius} ${color === 'currentColor' ? 'currentColor' : color}`,
+      color: color === 'currentColor' ? undefined : color,
     } : {
-      color: color,
+      color: color === 'currentColor' ? undefined : color,
     };
 
     return (

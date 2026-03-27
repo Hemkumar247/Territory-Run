@@ -36,10 +36,10 @@ export const RivalAlertBanner = React.forwardRef<HTMLDivElement, RivalAlertBanne
             <AlertCircle size={20} color={color} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-white truncate">
+            <p className="text-sm font-medium text-slate-900 dark:text-white truncate">
               <span className="font-bold" style={{ color }}>{rivalName}</span> claimed
             </p>
-            <p className="text-xs text-white/55 truncate">
+            <p className="text-xs text-slate-500 dark:text-white/55 truncate">
               {territoryName} • {timeAgo}
             </p>
           </div>

@@ -4,7 +4,7 @@ import L from 'leaflet';
 import { useLocation } from '../hooks/useLocation';
 import { useFirebase } from './FirebaseProvider';
 import { useGlobalData } from '../hooks/useGlobalData';
-import { LogOut, Navigation, AlertTriangle, Play, CheckCircle2, Loader2, Trophy, Moon, Sun, Square } from 'lucide-react';
+import { LogOut, Navigation, AlertTriangle, Play, CheckCircle2, Loader2, Trophy, Moon, Sun, Square, X } from 'lucide-react';
 import { logout } from '../services/authService';
 import { saveRunSession } from '../services/runService';
 import { Leaderboard } from './Leaderboard';
@@ -37,24 +37,17 @@ function RecenterAutomatically({ lat, lng, isTracking }: { lat: number; lng: num
 }
 
 // Component to set initial bounds to include user territory and current location
-function InitialMapBounds({ currentLocation, userTerritory }: { currentLocation: any, userTerritory: any }) {
+function InitialMapBounds({ currentLocation }: { currentLocation: any }) {
   const map = useMap();
   const [hasSetInitialBounds, setHasSetInitialBounds] = useState(false);
 
   useEffect(() => {
     if (!hasSetInitialBounds && currentLocation) {
-      if (userTerritory && userTerritory.coordinates && userTerritory.coordinates.length > 0) {
-        const bounds = L.latLngBounds([currentLocation.lat, currentLocation.lng], [currentLocation.lat, currentLocation.lng]);
-        userTerritory.coordinates.forEach((c: any) => {
-          bounds.extend([c.lat, c.lng]);
-        });
-        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
-      } else {
-        map.setView([currentLocation.lat, currentLocation.lng], 16);
-      }
+      // Always center on the user's exact current location with a close-up zoom
+      map.setView([currentLocation.lat, currentLocation.lng], 17);
       setHasSetInitialBounds(true);
     }
-  }, [currentLocation, userTerritory, map, hasSetInitialBounds]);
+  }, [currentLocation, map, hasSetInitialBounds]);
 
   return null;
 }
@@ -67,10 +60,17 @@ export function MapScreen() {
   const [isSaving, setIsSaving] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
   const [activeTab, setActiveTab] = useState<'map' | 'leaderboard' | 'profile' | 'settings'>('map');
-  const [showWelcome, setShowWelcome] = useState(true);
+  const [showWelcome, setShowWelcome] = useState(() => {
+    return !sessionStorage.getItem('welcomeShown');
+  });
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [summaryData, setSummaryData] = useState({ distance: 0, area: 0 });
   const [showRivalAlert, setShowRivalAlert] = useState(false);
+
+  const handleCloseWelcome = () => {
+    sessionStorage.setItem('welcomeShown', 'true');
+    setShowWelcome(false);
+  };
 
   // Randomly show rival alert during a run
   useEffect(() => {
@@ -220,12 +220,12 @@ export function MapScreen() {
           <div className="grid grid-cols-2 gap-4 my-8">
             <div className="bg-black/5 dark:bg-white/5 p-6 rounded-3xl border border-black/5 dark:border-white/5 backdrop-blur-sm transition-transform hover:scale-105">
               <p className="text-[10px] text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] font-semibold mb-2">Distance</p>
-              <p className="text-3xl font-display font-bold text-slate-900 dark:text-white">{summaryData.distance.toFixed(2)} <span className="text-sm text-slate-600 font-sans">km</span></p>
+              <p className="text-3xl font-display font-bold text-slate-900 dark:text-white">{summaryData.distance.toFixed(2)} <span className="text-sm text-slate-600 dark:text-slate-400 font-sans">km</span></p>
             </div>
             <div className="bg-black/5 dark:bg-white/5 p-6 rounded-3xl border border-black/5 dark:border-white/5 backdrop-blur-sm transition-transform hover:scale-105">
               <p className="text-[10px] text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] font-semibold mb-2">Territory</p>
               <p className="text-3xl font-display font-bold text-glow" style={{ color: userProfile?.territoryColor }}>
-                {Math.round(summaryData.area).toLocaleString()} <span className="text-sm text-slate-600 font-sans">m²</span>
+                {Math.round(summaryData.area).toLocaleString()} <span className="text-sm text-slate-600 dark:text-slate-400 font-sans">m²</span>
               </p>
             </div>
           </div>
@@ -288,7 +288,7 @@ export function MapScreen() {
                 <Navigation className="h-10 w-10 animate-bounce text-emerald-500 dark:text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)]" />
               </div>
               <p className="text-xs font-bold tracking-[0.3em] uppercase text-slate-600 dark:text-slate-300 mb-2">Acquiring Satellites</p>
-              <p className="text-sm font-medium text-slate-600 tracking-wide">Establishing secure connection...</p>
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-400 tracking-wide">Establishing secure connection...</p>
             </div>
           </div>
         ) : currentLocation ? (
@@ -309,7 +309,6 @@ export function MapScreen() {
             
             <InitialMapBounds 
               currentLocation={currentLocation} 
-              userTerritory={territories.find(t => t.uid === authUser?.uid)} 
             />
             <RecenterAutomatically lat={currentLocation.lat} lng={currentLocation.lng} isTracking={isTracking} />
             
@@ -441,7 +440,7 @@ export function MapScreen() {
           </div>
 
           <BottomHUD
-            className={(!isRunning && !isPaused) ? "bottom-24" : ""}
+            className={(!isRunning && !isPaused) ? "bottom-[100px]" : ""}
             isRunning={isRunning && !isPaused}
             isPaused={isPaused}
             distance={distance.toFixed(2)}
@@ -458,7 +457,7 @@ export function MapScreen() {
             <div className="absolute bottom-[280px] left-1/2 -translate-x-1/2 z-[1000]">
               <button
                 onClick={simulateRun}
-                className="text-[10px] text-white/50 uppercase tracking-widest hover:text-white transition-colors"
+                className="text-[10px] text-slate-500 dark:text-white/50 uppercase tracking-widest hover:text-slate-900 dark:hover:text-white transition-colors"
               >
                 [ Simulate Run ]
               </button>
@@ -482,7 +481,15 @@ export function MapScreen() {
       {/* Profile Screen */}
       {activeTab === 'profile' && userProfile && (
         <div className="absolute inset-0 z-[2000] bg-slate-100 dark:bg-[#050505] overflow-y-auto pb-24 pt-8 px-4 flex flex-col items-center">
-          <div className="w-full max-w-md mt-12">
+          <div className="w-full max-w-md mt-4 mb-4 flex justify-end">
+            <button
+              onClick={() => setActiveTab('map')}
+              className="p-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          <div className="w-full max-w-md">
             <ProfileCard
               name={userProfile.displayName || 'Runner'}
               level={Math.floor((userProfile.totalDistance || 0) / 10) + 1}
@@ -501,8 +508,16 @@ export function MapScreen() {
       {/* Settings Screen */}
       {activeTab === 'settings' && (
         <div className="absolute inset-0 z-[2000] bg-slate-100 dark:bg-[#050505] overflow-y-auto pb-24 pt-8 px-4 flex flex-col items-center">
-          <div className="w-full max-w-md mt-12 space-y-6">
-            <h2 className="text-2xl font-display font-bold text-slate-900 dark:text-white mb-6">Settings</h2>
+          <div className="w-full max-w-md mt-4 mb-4 flex justify-between items-center">
+            <h2 className="text-2xl font-display font-bold text-slate-900 dark:text-white">Settings</h2>
+            <button
+              onClick={() => setActiveTab('map')}
+              className="p-2 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-full transition-colors"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          <div className="w-full max-w-md space-y-6">
             
             <div className="glass-panel bg-white/90 dark:bg-black/40 rounded-2xl p-6 border border-black/10 dark:border-white/10">
               <div className="flex items-center justify-between">
@@ -512,12 +527,12 @@ export function MapScreen() {
                   </div>
                   <div>
                     <p className="font-medium text-slate-900 dark:text-white">Dark Mode</p>
-                    <p className="text-xs text-slate-500">Toggle dark/light theme</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Toggle dark/light theme</p>
                   </div>
                 </div>
                 <button
                   onClick={() => setIsDarkMode(!isDarkMode)}
-                  className={`w-12 h-6 rounded-full transition-colors relative ${isDarkMode ? 'bg-teal-500' : 'bg-slate-300'}`}
+                  className={`w-12 h-6 rounded-full transition-colors relative ${isDarkMode ? 'bg-teal-500' : 'bg-slate-300 dark:bg-slate-600'}`}
                 >
                   <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${isDarkMode ? 'left-7' : 'left-1'}`} />
                 </button>
@@ -539,7 +554,7 @@ export function MapScreen() {
 
       {/* Welcome Modal */}
       {showWelcome && userProfile && (
-        <WelcomeModal user={userProfile} onClose={() => setShowWelcome(false)} />
+        <WelcomeModal user={userProfile} onClose={handleCloseWelcome} />
       )}
     </div>
   );

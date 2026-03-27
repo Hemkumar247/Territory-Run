@@ -34,39 +34,39 @@ export const ProfileCard = React.forwardRef<HTMLDivElement, ProfileCardProps>(
               {avatarUrl ? (
                 <img src={avatarUrl} alt={name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
-                <div className="w-full h-full bg-white/10 flex items-center justify-center">
-                  <span className="text-white/50 text-2xl font-bold">{name.charAt(0).toUpperCase()}</span>
+                <div className="w-full h-full bg-black/5 dark:bg-white/10 flex items-center justify-center">
+                  <span className="text-slate-500 dark:text-white/50 text-2xl font-bold">{name.charAt(0).toUpperCase()}</span>
                 </div>
               )}
             </div>
-            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-black/80 border border-white/20 rounded-full px-3 py-0.5 backdrop-blur-md">
+            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-white/90 dark:bg-black/80 border border-black/10 dark:border-white/20 rounded-full px-3 py-0.5 backdrop-blur-md">
               <NeonText color={color} intensity="low" className="text-xs font-bold">Lvl {level}</NeonText>
             </div>
           </div>
 
-          <div className="flex-1">
-            <h2 className="text-2xl font-display font-bold text-white mb-1">{name}</h2>
-            <p className="text-sm text-white/60 mb-3">Urban Runner</p>
+          <div className="flex-1 min-w-0">
+            <h2 className="text-2xl font-display font-bold text-slate-900 dark:text-white mb-1 truncate">{name}</h2>
+            <p className="text-sm text-slate-500 dark:text-white/60 mb-3 truncate">Urban Runner</p>
             
-            <div className="w-full h-2 bg-white/10 rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-black/5 dark:bg-white/10 rounded-full overflow-hidden">
               <div 
                 className="h-full rounded-full transition-all duration-1000 ease-out"
                 style={{ width: `${progress}%`, backgroundColor: color, boxShadow: `0 0 10px ${color}` }}
               />
             </div>
             <div className="flex justify-between mt-1">
-              <span className="text-[10px] text-white/40 font-mono">{xp} XP</span>
-              <span className="text-[10px] text-white/40 font-mono">{nextLevelXp} XP</span>
+              <span className="text-[10px] text-slate-400 dark:text-white/40 font-mono">{xp} XP</span>
+              <span className="text-[10px] text-slate-400 dark:text-white/40 font-mono">{nextLevelXp} XP</span>
             </div>
           </div>
         </div>
 
-        <div className="h-[1px] w-full bg-white/10" />
+        <div className="h-[1px] w-full bg-slate-300 dark:bg-white/10" />
 
         <div className="grid grid-cols-3 gap-4">
-          <StatsDisplay label="Distance" value={totalDistance} unit="km" color="#00E5FF" />
-          <StatsDisplay label="Runs" value={totalRuns} color="#FFB800" />
-          <StatsDisplay label="Territory" value={territoryControlled} unit="sq km" color="#FF3CAC" />
+          <StatsDisplay label="Distance" value={totalDistance} unit="km" colorClass="text-[#008B99] dark:text-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,139,153,0.8)] dark:drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]" />
+          <StatsDisplay label="Runs" value={totalRuns} colorClass="text-[#B38000] dark:text-[#FFB800] drop-shadow-[0_0_8px_rgba(179,128,0,0.8)] dark:drop-shadow-[0_0_8px_rgba(255,184,0,0.8)]" />
+          <StatsDisplay label="Territory" value={territoryControlled} unit="sq km" colorClass="text-[#B32A78] dark:text-[#FF3CAC] drop-shadow-[0_0_8px_rgba(179,42,120,0.8)] dark:drop-shadow-[0_0_8px_rgba(255,60,172,0.8)]" />
         </div>
       </GlassCard>
     );

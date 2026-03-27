@@ -32,7 +32,7 @@ export function WelcomeModal({ user, onClose }: WelcomeModalProps) {
           </div>
           
           <h2 className="text-3xl font-display font-bold text-slate-900 dark:text-white mb-1 tracking-tight">Welcome back,</h2>
-          <p className="text-xl font-medium text-slate-600 dark:text-slate-400 mb-8 tracking-wide">{user.displayName}</p>
+          <p className="text-xl font-medium text-slate-600 dark:text-slate-400 mb-8 tracking-wide truncate px-4">{user.displayName}</p>
           
           <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-5 mb-8 border border-black/5 dark:border-white/5 backdrop-blur-sm">
             <div className="flex items-center justify-center gap-2 mb-3">
@@ -40,7 +40,7 @@ export function WelcomeModal({ user, onClose }: WelcomeModalProps) {
               <span className="text-[10px] font-bold text-yellow-600 dark:text-yellow-500 uppercase tracking-[0.2em]">Level {rank.level} • {rank.title}</span>
             </div>
             <p className="text-slate-600 dark:text-slate-400 text-xs uppercase tracking-widest mb-1">Total Distance</p>
-            <p className="text-slate-900 dark:text-white font-display font-bold text-2xl">{km} <span className="text-sm text-slate-600 font-sans">km</span></p>
+            <p className="text-slate-900 dark:text-white font-display font-bold text-2xl">{km} <span className="text-sm text-slate-600 dark:text-slate-400 font-sans">km</span></p>
             
             {nextAt && (
               <div className="mt-5">
@@ -50,7 +50,7 @@ export function WelcomeModal({ user, onClose }: WelcomeModalProps) {
                     style={{ width: `${progress}%`, backgroundColor: user.territoryColor }}
                   />
                 </div>
-                <p className="text-[10px] text-slate-600 mt-2 uppercase tracking-widest">
+                <p className="text-[10px] text-slate-600 dark:text-slate-400 mt-2 uppercase tracking-widest">
                   {(nextAt - parseFloat(km)).toFixed(2)} km to next level
                 </p>
               </div>

@@ -3,6 +3,7 @@ import { User as FirebaseAuthUser, onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { doc, getDocFromServer, onSnapshot } from 'firebase/firestore';
 import { User as CustomUser } from '../types';
+import { setSentryUser, clearSentryUser } from '../lib/sentry';
 
 interface FirebaseContextType {
   authUser: FirebaseAuthUser | null;
@@ -41,6 +42,9 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (!currentUser) {
         setUserProfile(null);
         setIsAuthReady(true);
+        clearSentryUser();
+      } else {
+        setSentryUser(currentUser.uid);
       }
     });
 

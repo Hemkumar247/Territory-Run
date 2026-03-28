@@ -220,11 +220,11 @@ export function MapScreen() {
           <div className="grid grid-cols-2 gap-4 my-8">
             <div className="bg-black/5 dark:bg-white/5 p-5 rounded-3xl border border-black/5 dark:border-white/5 backdrop-blur-sm transition-transform hover:scale-105 overflow-hidden min-w-0">
               <p className="text-[10px] text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] font-semibold mb-2 truncate">Distance</p>
-              <p className="text-2xl font-display font-bold text-slate-900 dark:text-white leading-tight break-all">{summaryData.distance.toFixed(2)} <span className="text-sm text-slate-600 dark:text-slate-400 font-sans font-normal">km</span></p>
+              <p className="text-2xl font-display font-bold text-slate-900 dark:text-white leading-tight truncate">{summaryData.distance.toFixed(2)} <span className="text-sm text-slate-600 dark:text-slate-400 font-sans font-normal">km</span></p>
             </div>
             <div className="bg-black/5 dark:bg-white/5 p-5 rounded-3xl border border-black/5 dark:border-white/5 backdrop-blur-sm transition-transform hover:scale-105 overflow-hidden min-w-0">
               <p className="text-[10px] text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] font-semibold mb-2 truncate">Territory</p>
-              <p className="text-2xl font-display font-bold text-glow leading-tight break-all" style={{ color: userProfile?.territoryColor }}>
+              <p className="text-2xl font-display font-bold text-glow leading-tight truncate" style={{ color: userProfile?.territoryColor }}>
                 {Math.round(summaryData.area).toLocaleString()} <span className="text-sm text-slate-600 dark:text-slate-400 font-sans font-normal">m²</span>
               </p>
             </div>
@@ -244,17 +244,41 @@ export function MapScreen() {
   return (
     <div className="relative h-screen w-full bg-slate-100 dark:bg-[#050505] flex flex-col overflow-hidden">
       {/* Top Navigation Bar */}
-      <div className="absolute top-0 left-0 right-0 z-[1000] flex items-center justify-between p-6 pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-3 glass-panel bg-white/90 dark:bg-black/40 px-5 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10">
-          <div className="relative flex h-2.5 w-2.5">
+      <div className="absolute top-0 left-0 right-0 z-[1000] flex items-center justify-between p-4 pointer-events-none">
+        {/* Left: User territory strength indicator */}
+        <div className="pointer-events-auto flex items-center gap-2.5 glass-panel bg-white/90 dark:bg-black/40 px-4 py-2.5 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10">
+          <div
+            className="w-2.5 h-2.5 rounded-full shrink-0 animate-glow-pulse"
+            style={{ backgroundColor: userProfile?.territoryColor || '#00E5FF', boxShadow: `0 0 8px ${userProfile?.territoryColor || '#00E5FF'}` }}
+          />
+          <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 tracking-[0.2em] uppercase font-mono">
+            STR {userProfile?.territoryStrength ?? 0}
+          </span>
+        </div>
+
+        {/* Right: GPS status */}
+        <div className="pointer-events-auto flex items-center gap-2.5 glass-panel bg-white/90 dark:bg-black/40 px-4 py-2.5 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10">
+          <div className="relative flex h-2 w-2">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </div>
           <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 tracking-[0.2em] uppercase">
-            {isTracking ? 'GPS Active' : 'Locating...'}
+            {isTracking ? 'GPS' : 'Locating…'}
           </span>
         </div>
       </div>
+
+      {/* Recording indicator — shown during active run (top-center) */}
+      {(isRunning || isPaused) && (
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 z-[1001] pt-4 pointer-events-none">
+          <div className="flex items-center gap-2 glass-panel bg-white/90 dark:bg-black/50 px-4 py-2 rounded-full border border-black/10 dark:border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.15)]">
+            <span className={`w-2 h-2 rounded-full bg-[#FF3CAC] shrink-0 ${isPaused ? '' : 'animate-recording-blink'}`} />
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-700 dark:text-[#FF3CAC]">
+              {isPaused ? 'Paused' : 'Recording'}
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Error Banner */}
       {error && (
@@ -280,15 +304,27 @@ export function MapScreen() {
       {/* Map Container */}
       <div className="flex-1 w-full relative z-0">
         {!currentLocation && !error ? (
-          <div className="h-full w-full flex flex-col items-center justify-center bg-slate-100 dark:bg-[#050505] text-slate-600 dark:text-slate-400 relative overflow-hidden">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/10 rounded-full blur-[120px] mix-blend-screen pointer-events-none" />
-            
-            <div className="relative z-10 flex flex-col items-center">
-              <div className="w-24 h-24 rounded-full border border-black/10 dark:border-white/10 flex items-center justify-center mb-8 bg-black/5 dark:bg-white/5 shadow-[0_0_30px_rgba(0,0,0,0.05)] dark:shadow-[0_0_30px_rgba(255,255,255,0.05)]">
-                <Navigation className="h-10 w-10 animate-bounce text-emerald-500 dark:text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)]" />
+          <div className="h-full w-full flex flex-col items-center justify-center bg-slate-100 dark:bg-[#080B12] text-slate-600 dark:text-slate-400 relative overflow-hidden">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-[#00E5FF]/8 dark:bg-[#00E5FF]/10 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute top-1/3 right-1/4 w-64 h-64 bg-[#7B2FFF]/5 dark:bg-[#7B2FFF]/10 rounded-full blur-[100px] pointer-events-none" />
+
+            <div className="relative z-10 flex flex-col items-center gap-6">
+              <div className="w-24 h-24 rounded-2xl border border-black/10 dark:border-white/10 flex items-center justify-center bg-black/5 dark:bg-white/5 shadow-[0_0_30px_rgba(0,0,0,0.05)] dark:shadow-[0_0_40px_rgba(0,229,255,0.1)]">
+                <Navigation className="h-10 w-10 animate-bounce text-[#008B99] dark:text-[#00E5FF] drop-shadow-[0_0_15px_rgba(0,229,255,0.6)]" />
               </div>
-              <p className="text-xs font-bold tracking-[0.3em] uppercase text-slate-600 dark:text-slate-300 mb-2">Acquiring Satellites</p>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400 tracking-wide">Establishing secure connection...</p>
+              <div className="text-center">
+                <p className="text-xs font-bold tracking-[0.3em] uppercase text-slate-600 dark:text-[#00E5FF]/80 mb-2">Acquiring Satellites</p>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400 tracking-wide">Establishing secure connection…</p>
+              </div>
+              <div className="flex gap-2">
+                {[0, 1, 2].map(i => (
+                  <div
+                    key={i}
+                    className="w-1.5 h-1.5 rounded-full bg-[#008B99] dark:bg-[#00E5FF]"
+                    style={{ animation: `recording-blink 1.2s ease-in-out ${i * 0.2}s infinite` }}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         ) : currentLocation ? (
@@ -428,8 +464,8 @@ export function MapScreen() {
       {/* Bottom HUD & Navigation */}
       {activeTab === 'map' && (
         <>
-          {/* Rival Alert Banner (Example) */}
-          <div className="absolute top-24 left-0 right-0 z-[1000] pointer-events-none">
+          {/* Rival Alert Banner */}
+          <div className="absolute top-[72px] left-0 right-0 z-[1000] pointer-events-none">
             {showRivalAlert && (
               <RivalAlertBanner 
                 rivalName="NeonGhost" 
@@ -446,6 +482,7 @@ export function MapScreen() {
             distance={distance.toFixed(2)}
             pace={formatPace(distance, elapsedTime)}
             time={formatTime(elapsedTime)}
+            territory={(isRunning || isPaused) ? Math.round(territoryArea).toLocaleString() : undefined}
             onStart={startRun}
             onPause={pauseRun}
             onResume={resumeRun}

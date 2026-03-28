@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
+    "@sentry/react": "^8.55.1",
     "@tailwindcss/vite": "^4.1.14",
     "@turf/turf": "^7.3.4",
     "@vis.gl/react-google-maps": "^1.7.1",

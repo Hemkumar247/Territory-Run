@@ -1,0 +1,146 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth !== null && auth.uid === $uid",
+        ".write": "auth !== null && auth.uid === $uid && (!data.exists() || data.child('lastWrite').val() + 3000 <= now)",
+        ".validate": "newData.hasChildren(['uid', 'displayName', 'lastWrite'])",
+        "uid": {
+          ".validate": "newData.isString() && newData.val() === auth.uid"
+        },
+        "displayName": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length < 100"
+        },
+        "lastWrite": {
+          ".validate": "newData.isNumber() && newData.val() >= now - 1000 && newData.val() <= now"
+        },
+        "totalDistance": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "territoryStrength": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "wins": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "losses": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "lastActive": {
+          ".validate": "newData.isNumber()"
+        },
+        "fcmToken": {
+          ".validate": "newData.isString() && newData.val().length < 200"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+
+    "territories": {
+      ".read": "auth !== null",
+      "$uid": {
+        ".write": "auth !== null && auth.uid === $uid && (!data.exists() || data.child('lastWrite').val() + 3000 <= now)",
+        ".validate": "newData.hasChildren(['uid', 'coordinates', 'lastWrite'])",
+        "uid": {
+          ".validate": "newData.isString() && newData.val() === auth.uid"
+        },
+        "lastWrite": {
+          ".validate": "newData.isNumber() && newData.val() >= now - 1000 && newData.val() <= now"
+        },
+        "strength": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "lastUpdated": {
+          ".validate": "newData.isNumber()"
+        },
+        "areaKm2": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "coordinates": {
+          "$index": {
+            ".validate": "newData.hasChildren(['lat', 'lng'])",
+            "lat": {
+              ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
+            },
+            "lng": {
+              ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
+
+    "leaderboard": {
+      ".read": "auth !== null",
+      ".write": false
+    },
+
+    "leaderboard_updated": {
+      ".read": "auth !== null",
+      ".write": false
+    },
+
+    "sessions": {
+      "$uid": {
+        ".read": "auth !== null && auth.uid === $uid",
+        "$sessionId": {
+          ".write": "auth !== null && auth.uid === $uid",
+          ".validate": "newData.hasChildren(['uid', 'startTime', 'endTime', 'distanceCovered'])",
+          "uid": {
+            ".validate": "newData.isString() && newData.val() === auth.uid"
+          },
+          "startTime": {
+            ".validate": "newData.isNumber()"
+          },
+          "endTime": {
+            ".validate": "newData.isNumber()"
+          },
+          "distanceCovered": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "territoryGained": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "territoryLost": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "coordinatesTrail": {
+            "$trailIndex": {
+              ".validate": "newData.hasChildren(['lat', 'lng', 'timestamp'])",
+              "lat": {
+                ".validate": "newData.isNumber() && newData.val() >= -90 && newData.val() <= 90"
+              },
+              "lng": {
+                ".validate": "newData.isNumber() && newData.val() >= -180 && newData.val() <= 180"
+              },
+              "timestamp": {
+                ".validate": "newData.isNumber()"
+              }
+            }
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      }
+    },
+
+    "_rivalConflicts": {
+      ".read": false,
+      ".write": false
+    },
+
+    "_processing": {
+      ".read": false,
+      ".write": false
+    }
+  }
+}

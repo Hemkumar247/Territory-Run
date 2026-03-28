@@ -49,16 +49,16 @@ export const LeaderboardItem = React.forwardRef<HTMLDivElement, LeaderboardItemP
           <p className="text-xs text-slate-500 dark:text-white/50">Territory Controlled</p>
         </div>
 
-        <div className="text-right">
+        <div className="text-right shrink-0 max-w-[80px] min-w-0">
           <NeonText
             color={isCurrentUser ? color : 'currentColor'}
             glow={isCurrentUser}
             intensity="low"
-            className="font-mono text-xl font-bold text-slate-900 dark:text-white"
+            className="font-mono text-lg font-bold text-slate-900 dark:text-white tabular-nums truncate block"
           >
             {score}
           </NeonText>
-          <p className="text-[10px] text-slate-400 dark:text-white/40 uppercase tracking-wider">sq km</p>
+          <p className="text-[10px] text-slate-400 dark:text-white/40 uppercase tracking-wider">m²</p>
         </div>
       </GlassCard>
     );

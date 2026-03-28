@@ -35,9 +35,9 @@ export function WelcomeModal({ user, onClose }: WelcomeModalProps) {
           <p className="text-xl font-medium text-slate-600 dark:text-slate-400 mb-8 tracking-wide truncate px-4">{user.displayName}</p>
           
           <div className="bg-black/5 dark:bg-white/5 rounded-2xl p-5 mb-8 border border-black/5 dark:border-white/5 backdrop-blur-sm">
-            <div className="flex items-center justify-center gap-2 mb-3">
-              <Trophy className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
-              <span className="text-[10px] font-bold text-yellow-600 dark:text-yellow-500 uppercase tracking-[0.2em]">Level {rank.level} • {rank.title}</span>
+            <div className="flex items-center justify-center gap-2 mb-3 min-w-0">
+              <Trophy className="h-4 w-4 text-yellow-600 dark:text-yellow-500 shrink-0" />
+              <span className="text-[10px] font-bold text-yellow-600 dark:text-yellow-500 uppercase tracking-[0.2em] truncate">Level {rank.level} • {rank.title}</span>
             </div>
             <p className="text-slate-600 dark:text-slate-400 text-xs uppercase tracking-widest mb-1">Total Distance</p>
             <p className="text-slate-900 dark:text-white font-display font-bold text-2xl">{km} <span className="text-sm text-slate-600 dark:text-slate-400 font-sans">km</span></p>

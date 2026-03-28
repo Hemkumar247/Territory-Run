@@ -61,14 +61,14 @@ export function AuthScreen() {
           <h2 className="mt-2 text-4xl font-display font-bold text-slate-900 dark:text-white tracking-tight">
             Territory Run
           </h2>
-          <p className="mt-3 text-sm font-medium text-slate-600 dark:text-slate-400 tracking-wide uppercase">
+          <p className="mt-3 text-sm font-medium text-slate-600 dark:text-slate-400 tracking-wide uppercase break-words">
             {isLogin ? 'Sign in to claim your territory' : 'Create an account to start running'}
           </p>
         </div>
 
         {error && (
           <div className="rounded-2xl bg-red-500/10 p-4 border border-red-500/20 backdrop-blur-sm">
-            <p className="text-sm text-red-400 font-medium text-center">{error}</p>
+            <p className="text-sm text-red-400 font-medium text-center break-words">{error}</p>
           </div>
         )}
 
@@ -180,7 +180,7 @@ export function AuthScreen() {
               setIsLogin(!isLogin);
               setError(null);
             }}
-            className="text-xs font-bold uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+            className="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors break-words text-center"
           >
             {isLogin ? "Don't have an account? Sign up" : 'Already have an account? Sign in'}
           </button>

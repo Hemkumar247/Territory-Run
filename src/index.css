@@ -39,11 +39,7 @@
   --text-color: #F0F4FF;
 }
 
-body {
-  background-color: var(--bg-color);
-  color: var(--text-color);
-  @apply antialiased selection:bg-neon-primary/30 transition-colors duration-500;
-}
+
 
 @layer utilities {
   .glass-card-base {
@@ -186,6 +182,16 @@ body {
   .territory-pulse-slow {
     animation: territory-pulse 4.5s infinite alternate ease-in-out;
   }
+  .territory-label span.territory-label-name {
+    max-width: 90px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    display: inline-block;
+    vertical-align: middle;
+    padding: 0 4px;
+  }
+
   .territory-label {
     background: rgba(13, 17, 23, 0.85);
     backdrop-filter: blur(8px);

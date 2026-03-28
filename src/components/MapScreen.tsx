@@ -218,14 +218,14 @@ export function MapScreen() {
           <h2 className="text-4xl font-display font-bold text-slate-900 dark:text-white tracking-tight">Sector Secured</h2>
           
           <div className="grid grid-cols-2 gap-4 my-8">
-            <div className="bg-black/5 dark:bg-white/5 p-6 rounded-3xl border border-black/5 dark:border-white/5 backdrop-blur-sm transition-transform hover:scale-105">
-              <p className="text-[10px] text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] font-semibold mb-2">Distance</p>
-              <p className="text-3xl font-display font-bold text-slate-900 dark:text-white">{summaryData.distance.toFixed(2)} <span className="text-sm text-slate-600 dark:text-slate-400 font-sans">km</span></p>
+            <div className="bg-black/5 dark:bg-white/5 p-5 rounded-3xl border border-black/5 dark:border-white/5 backdrop-blur-sm transition-transform hover:scale-105 overflow-hidden min-w-0">
+              <p className="text-[10px] text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] font-semibold mb-2 truncate">Distance</p>
+              <p className="text-2xl font-display font-bold text-slate-900 dark:text-white leading-tight break-all">{summaryData.distance.toFixed(2)} <span className="text-sm text-slate-600 dark:text-slate-400 font-sans font-normal">km</span></p>
             </div>
-            <div className="bg-black/5 dark:bg-white/5 p-6 rounded-3xl border border-black/5 dark:border-white/5 backdrop-blur-sm transition-transform hover:scale-105">
-              <p className="text-[10px] text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] font-semibold mb-2">Territory</p>
-              <p className="text-3xl font-display font-bold text-glow" style={{ color: userProfile?.territoryColor }}>
-                {Math.round(summaryData.area).toLocaleString()} <span className="text-sm text-slate-600 dark:text-slate-400 font-sans">m²</span>
+            <div className="bg-black/5 dark:bg-white/5 p-5 rounded-3xl border border-black/5 dark:border-white/5 backdrop-blur-sm transition-transform hover:scale-105 overflow-hidden min-w-0">
+              <p className="text-[10px] text-slate-600 dark:text-slate-400 uppercase tracking-[0.2em] font-semibold mb-2 truncate">Territory</p>
+              <p className="text-2xl font-display font-bold text-glow leading-tight break-all" style={{ color: userProfile?.territoryColor }}>
+                {Math.round(summaryData.area).toLocaleString()} <span className="text-sm text-slate-600 dark:text-slate-400 font-sans font-normal">m²</span>
               </p>
             </div>
           </div>
@@ -345,7 +345,7 @@ export function MapScreen() {
                     <div class="flex items-center justify-center w-5 h-5 rounded-full text-white text-[10px] font-bold shadow-inner" style="background-color: ${color}">
                       ${initial}
                     </div>
-                    <span class="px-1">${territory.user?.displayName || 'Unknown'}</span>
+                    <span class="territory-label-name">${territory.user?.displayName || 'Unknown'}</span>
                     <div class="flex items-center gap-0.5 bg-black/5 dark:bg-white/10 rounded-full px-1.5 py-0.5 ml-0.5">
                       <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
                       <span class="text-[9px] font-bold">${strength}</span>

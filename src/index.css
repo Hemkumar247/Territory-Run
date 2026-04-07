@@ -187,12 +187,11 @@ body {
     animation: territory-pulse-low 4.5s infinite alternate ease-in-out;
   }
   .territory-label {
-    background: rgba(13, 17, 23, 0.85);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    border-radius: 9999px;
-    padding: 2px 8px 2px 2px;
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+    padding: 0;
     font-size: 10px;
     font-weight: 700;
     color: #F0F4FF;
@@ -201,7 +200,6 @@ body {
     transform: translate(-50%, -50%);
     display: flex;
     align-items: center;
-    gap: 4px;
     text-transform: uppercase;
     letter-spacing: 0.05em;
   }

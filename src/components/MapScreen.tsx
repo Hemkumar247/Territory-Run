@@ -56,32 +56,35 @@ function InitialMapBounds({ currentLocation }: { currentLocation: any }) {
   return null;
 }
 
-// Component to add a locate me button
-function LocateMeButton({ currentLocation }: { currentLocation: any }) {
-  const map = useMap();
-  
-  return (
-    <div style={{ bottom: '120px', left: '10px', position: 'absolute', zIndex: 1000, pointerEvents: 'auto' }}>
-      <button
-        onClick={(e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          if (currentLocation) {
-            map.setView([currentLocation.lat, currentLocation.lng], 17, { animate: true });
-          }
-        }}
-        onPointerDown={(e) => e.stopPropagation()}
-        onDoubleClick={(e) => e.stopPropagation()}
-        className="w-10 h-10 flex items-center justify-center text-slate-700 dark:text-white hover:text-teal-500 dark:hover:text-teal-400 transition-colors bg-white/90 dark:bg-black/80 rounded-full backdrop-blur-sm border border-black/10 dark:border-white/10 shadow-lg"
-        title="Go to my location"
-      >
-        <LocateFixed className="w-5 h-5" />
-      </button>
-    </div>
-  );
-}
-
 import { AchievementBadge } from './ui/AchievementBadge';
+import { User } from '../types';
+
+function getTerritoryBadgeSVG(user: User | undefined): string {
+  if (!user) return '';
+  
+  const achs = user.achievements || [];
+  
+  // Define SVGs for achievements and levels
+  const svgs = {
+    century_club: `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-400 drop-shadow-[0_0_3px_rgba(250,204,21,0.8)]"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>`,
+    marathoner: `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-400 drop-shadow-[0_0_3px_rgba(96,165,250,0.8)]"><path d="M7.21 15 2.66 7.14a2 2 0 0 1 .13-2.2L4.4 2.8A2 2 0 0 1 6 2h12a2 2 0 0 1 1.6.8l1.6 2.14a2 2 0 0 1 .14 2.2L16.79 15"></path><path d="M11 12 5.12 2.2"></path><path d="m13 12 5.88-9.8"></path><path d="M8 7h8"></path><circle cx="12" cy="17" r="5"></circle><path d="M12 18v-2h-.5"></path></svg>`,
+    empire_builder: `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-400 drop-shadow-[0_0_3px_rgba(52,211,153,0.8)]"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path><line x1="4" x2="4" y1="22" y2="15"></line></svg>`,
+    first_run: `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-orange-400 drop-shadow-[0_0_3px_rgba(251,146,60,0.8)]"><path d="M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z"></path><path d="M20 20v-2.38c0-2.12 1.03-3.12 1-5.62-.03-2.72-1.49-6-4.5-6C14.63 6 14 7.8 14 9.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z"></path><path d="M16 17h4"></path><path d="M4 13h4"></path></svg>`,
+    default: `<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-300 drop-shadow-[0_0_3px_rgba(203,213,225,0.8)]"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>`
+  };
+
+  if (achs.includes('century_club')) return svgs.century_club;
+  if (achs.includes('marathoner')) return svgs.marathoner;
+  if (achs.includes('empire_builder')) return svgs.empire_builder;
+  if (achs.includes('first_run')) return svgs.first_run;
+  
+  // Fallback to level-based
+  const level = Math.floor((user.totalDistance || 0) / 10) + 1;
+  if (level >= 10) return svgs.century_club; // Gold/Trophy
+  if (level >= 5) return svgs.marathoner; // Silver/Medal
+  
+  return svgs.default; // Bronze/Star
+}
 
 export function MapScreen() {
   const { userProfile, authUser } = useFirebase();
@@ -325,6 +328,19 @@ export function MapScreen() {
             {isTracking ? 'GPS Active' : 'Locating...'}
           </span>
         </div>
+
+        {/* Simulate Run Button (Dev only) */}
+        {!isRunning && !isPaused && (
+          <button
+            onClick={simulateRun}
+            className="pointer-events-auto flex items-center gap-2 glass-panel bg-white/90 dark:bg-black/40 px-4 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10 hover:bg-white dark:hover:bg-black/60 transition-colors"
+          >
+            <Play className="h-3.5 w-3.5 text-slate-700 dark:text-slate-200" />
+            <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 tracking-[0.2em] uppercase">
+              Simulate
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Error Banner */}
@@ -381,9 +397,6 @@ export function MapScreen() {
             <InitialMapBounds 
               currentLocation={currentLocation} 
             />
-            <LocateMeButton 
-              currentLocation={currentLocation} 
-            />
             <RecenterAutomatically lat={currentLocation.lat} lng={currentLocation.lng} isRunning={isRunning} />
             
             {/* Render all saved territories from the database */}
@@ -416,13 +429,16 @@ export function MapScreen() {
                 className: 'bg-transparent border-none',
                 html: `
                   <div class="territory-label">
-                    <div class="flex items-center justify-center w-5 h-5 rounded-full text-white text-[10px] font-bold shadow-inner" style="background-color: ${color}">
+                    <div class="relative flex items-center justify-center w-6 h-6 rounded-full text-white text-xs font-bold shadow-inner" style="background-color: ${color}">
                       ${initial}
+                      <div class="absolute -bottom-1 -right-1 bg-slate-900 rounded-full p-0.5 border border-slate-700 shadow-sm flex items-center justify-center">
+                        ${getTerritoryBadgeSVG(territory.user)}
+                      </div>
                     </div>
-                    <span class="px-1">${territory.user?.displayName || 'Unknown'}</span>
-                    <div class="flex items-center gap-0.5 bg-black/5 dark:bg-white/10 rounded-full px-1.5 py-0.5 ml-0.5">
+                    <span class="px-1.5 font-display font-bold tracking-tight text-white drop-shadow-md">${territory.user?.displayName || 'Unknown'}</span>
+                    <div class="flex items-center gap-0.5 bg-black/40 backdrop-blur-sm rounded-full px-1.5 py-0.5 ml-0.5 border border-white/10">
                       <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
-                      <span class="text-[9px] font-bold">${strength}</span>
+                      <span class="text-[9px] font-bold text-white">${strength}</span>
                     </div>
                   </div>
                 `,
@@ -558,18 +574,6 @@ export function MapScreen() {
             onResume={resumeRun}
             onStop={handleFinishRun}
           />
-
-          {/* Simulate Run Button (Dev only) */}
-          {!isRunning && !isPaused && (
-            <div className="absolute bottom-[120px] right-4 z-[1000]">
-              <button
-                onClick={simulateRun}
-                className="text-[10px] text-slate-500 dark:text-white/50 uppercase tracking-widest hover:text-slate-900 dark:hover:text-white transition-colors bg-white/50 dark:bg-black/50 px-3 py-1.5 rounded-full backdrop-blur-sm border border-black/10 dark:border-white/10"
-              >
-                [ Simulate Run ]
-              </button>
-            </div>
-          )}
         </>
       )}
 

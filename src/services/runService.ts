@@ -1,9 +1,10 @@
 import { db } from '../lib/firebase';
-import { collection, doc, setDoc, updateDoc, increment, serverTimestamp } from 'firebase/firestore';
-import { Coordinate, Session, Territory } from '../types';
+import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { Coordinate, Session, Territory, User } from '../types';
+import { checkAchievements } from '../lib/achievements';
 
 export async function saveRunSession(
-  uid: string,
+  userProfile: User,
   trail: (Coordinate & { timestamp: number })[],
   distanceCovered: number,
   territoryPolygon: [number, number][] | null, // [lng, lat] format from Turf
@@ -11,6 +12,7 @@ export async function saveRunSession(
 ) {
   if (trail.length === 0) return;
 
+  const uid = userProfile.uid;
   const startTime = new Date(trail[0].timestamp);
   const endTime = new Date(trail[trail.length - 1].timestamp);
 
@@ -47,10 +49,17 @@ export async function saveRunSession(
     await setDoc(territoryRef, territoryData);
   }
 
-  // 3. Update the User Profile
+  // 3. Check for new achievements
+  const newAchievements = checkAchievements(userProfile, {
+    distanceCovered,
+    territoryGained: territoryArea
+  });
+
+  // 4. Update the User Profile
   const userRef = doc(db, 'users', uid);
   const userUpdates: any = {
     totalDistance: increment(distanceCovered),
+    totalRuns: increment(1),
     lastActive: serverTimestamp(),
   };
   
@@ -58,5 +67,11 @@ export async function saveRunSession(
     userUpdates.territoryStrength = 100; // Reset strength if new territory
   }
 
+  if (newAchievements.length > 0) {
+    userUpdates.achievements = arrayUnion(...newAchievements);
+  }
+
   await updateDoc(userRef, userUpdates);
+  
+  return newAchievements;
 }

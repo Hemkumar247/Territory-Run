@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Territory, User, Coordinate } from '../types';
+import { calculateDecayedStrength } from '../lib/utils';
 
 export interface EnrichedTerritory extends Territory {
   user?: User;
@@ -95,22 +96,22 @@ export function useGlobalData() {
           {
             uid: 'mock1',
             coordinates: generateMockTerritory(lat + 0.002, lng + 0.002, 0.0015),
-            strength: 850,
-            lastUpdated: new Date(),
+            strength: 100,
+            lastUpdated: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2), // 2 days ago (strength ~80)
             areaKm2: 0.85
           },
           {
             uid: 'mock2',
             coordinates: generateMockTerritory(lat - 0.003, lng + 0.001, 0.0012),
-            strength: 620,
-            lastUpdated: new Date(),
+            strength: 100,
+            lastUpdated: new Date(Date.now() - 1000 * 60 * 60 * 24 * 6), // 6 days ago (strength ~40)
             areaKm2: 0.62
           },
           {
             uid: 'mock3',
             coordinates: generateMockTerritory(lat + 0.001, lng - 0.003, 0.001),
-            strength: 410,
-            lastUpdated: new Date(),
+            strength: 100,
+            lastUpdated: new Date(Date.now() - 1000 * 60 * 60 * 24 * 9), // 9 days ago (strength ~10)
             areaKm2: 0.41
           }
         ];
@@ -179,8 +180,19 @@ export function useGlobalData() {
 
   const leaderboardUsers = useMemo(() => {
     const allUsers = { ...mockData.users, ...users };
-    return Object.values(allUsers).sort((a, b) => b.totalDistance - a.totalDistance);
-  }, [users, mockData]);
+    
+    // Calculate current decayed strength for each user based on their territories
+    const userStrengths: Record<string, number> = {};
+    enrichedTerritories.forEach(t => {
+      const decayed = calculateDecayedStrength(t.strength || 0, t.lastUpdated);
+      userStrengths[t.uid] = (userStrengths[t.uid] || 0) + decayed;
+    });
+
+    return Object.values(allUsers).map(user => ({
+      ...user,
+      territoryStrength: userStrengths[user.uid] || 0
+    })).sort((a, b) => (b.territoryStrength || 0) - (a.territoryStrength || 0));
+  }, [users, mockData, enrichedTerritories]);
 
   return { territories: enrichedTerritories, leaderboardUsers, loading };
 }

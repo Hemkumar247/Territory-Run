@@ -3,6 +3,7 @@ import { cn } from '../../lib/utils';
 import { GlassCard } from './GlassCard';
 import { NeonText } from './NeonText';
 import { StatsDisplay } from './StatsDisplay';
+import { AchievementBadge } from './AchievementBadge';
 
 export interface ProfileCardProps extends React.HTMLAttributes<HTMLDivElement> {
   name: string;
@@ -13,11 +14,13 @@ export interface ProfileCardProps extends React.HTMLAttributes<HTMLDivElement> {
   totalDistance: number;
   totalRuns: number;
   territoryControlled: number;
+  avgStrength?: number;
+  achievements?: string[];
   color?: string;
 }
 
 export const ProfileCard = React.forwardRef<HTMLDivElement, ProfileCardProps>(
-  ({ className, name, level, xp, nextLevelXp, avatarUrl, totalDistance, totalRuns, territoryControlled, color = '#7B2FFF', ...props }, ref) => {
+  ({ className, name, level, xp, nextLevelXp, avatarUrl, totalDistance, totalRuns, territoryControlled, avgStrength = 0, achievements = [], color = '#7B2FFF', ...props }, ref) => {
     
     const progress = Math.min(100, Math.max(0, (xp / nextLevelXp) * 100));
 
@@ -65,11 +68,26 @@ export const ProfileCard = React.forwardRef<HTMLDivElement, ProfileCardProps>(
 
         <div className="h-[1px] w-full bg-slate-300 dark:bg-white/10" />
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-4 gap-2">
           <StatsDisplay label="Distance" value={totalDistance} unit="km" colorClass="text-[#008B99] dark:text-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,139,153,0.8)] dark:drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]" />
           <StatsDisplay label="Runs" value={totalRuns} colorClass="text-[#B38000] dark:text-[#FFB800] drop-shadow-[0_0_8px_rgba(179,128,0,0.8)] dark:drop-shadow-[0_0_8px_rgba(255,184,0,0.8)]" />
-          <StatsDisplay label="Territory" value={territoryControlled} unit="sq km" colorClass="text-[#B32A78] dark:text-[#FF3CAC] drop-shadow-[0_0_8px_rgba(179,42,120,0.8)] dark:drop-shadow-[0_0_8px_rgba(255,60,172,0.8)]" />
+          <StatsDisplay label="Area" value={territoryControlled} unit="km²" colorClass="text-[#B32A78] dark:text-[#FF3CAC] drop-shadow-[0_0_8px_rgba(179,42,120,0.8)] dark:drop-shadow-[0_0_8px_rgba(255,60,172,0.8)]" />
+          <StatsDisplay label="Power" value={avgStrength} unit="%" colorClass="text-emerald-600 dark:text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.8)]" />
         </div>
+
+        {achievements.length > 0 && (
+          <>
+            <div className="h-[1px] w-full bg-slate-300 dark:bg-white/10" />
+            <div>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 uppercase tracking-[0.2em] font-semibold mb-3">Achievements</p>
+              <div className="flex flex-wrap gap-2">
+                {achievements.map(achId => (
+                  <AchievementBadge key={achId} id={achId} size="sm" />
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </GlassCard>
     );
   }

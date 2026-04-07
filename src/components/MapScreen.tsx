@@ -10,6 +10,7 @@ import { saveRunSession } from '../services/runService';
 import { Leaderboard } from './Leaderboard';
 import { WelcomeModal } from './WelcomeModal';
 import * as turf from '@turf/turf';
+import { calculateDecayedStrength, getStrengthLevel } from '../lib/utils';
 
 import { NavigationTabBar } from './ui/NavigationTabBar';
 import { BottomHUD } from './ui/BottomHUD';
@@ -80,10 +81,33 @@ function LocateMeButton({ currentLocation }: { currentLocation: any }) {
   );
 }
 
+import { AchievementBadge } from './ui/AchievementBadge';
+
 export function MapScreen() {
   const { userProfile, authUser } = useFirebase();
   const { currentLocation, trail, error, isTracking, isRunning, isPaused, elapsedTime, totalDistanceCovered, startRun, pauseRun, resumeRun, endRun, resetRun, simulateRun } = useLocation();
   const { territories, leaderboardUsers, loading } = useGlobalData();
+  
+  // Calculate user's total territory stats
+  const userTerritoryStats = useMemo(() => {
+    if (!authUser) return { totalArea: 0, avgStrength: 0 };
+    
+    const userTerritories = territories.filter(t => t.uid === authUser.uid);
+    if (userTerritories.length === 0) return { totalArea: 0, avgStrength: 0 };
+    
+    let totalArea = 0;
+    let totalStrength = 0;
+    
+    userTerritories.forEach(t => {
+      totalArea += (t.areaKm2 || 0);
+      totalStrength += calculateDecayedStrength(t.strength || 0, t.lastUpdated);
+    });
+    
+    return {
+      totalArea: totalArea,
+      avgStrength: Math.round(totalStrength / userTerritories.length)
+    };
+  }, [territories, authUser]);
   
   const [isSaving, setIsSaving] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
@@ -202,8 +226,10 @@ export function MapScreen() {
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
+  const [newAchievements, setNewAchievements] = useState<string[]>([]);
+
   const handleFinishRun = async () => {
-    if (!authUser) return;
+    if (!authUser || !userProfile) return;
     
     if (trail.length < 2) {
       // Not enough data to save a run
@@ -214,8 +240,8 @@ export function MapScreen() {
 
     setIsSaving(true);
     try {
-      await saveRunSession(
-        authUser.uid,
+      const unlockedAchievements = await saveRunSession(
+        userProfile,
         trail,
         distance * 1000, // Convert km to meters for storage
         territoryPolygon,
@@ -223,6 +249,9 @@ export function MapScreen() {
       );
       
       setSummaryData({ distance, area: territoryArea });
+      if (unlockedAchievements && unlockedAchievements.length > 0) {
+        setNewAchievements(unlockedAchievements);
+      }
       setShowSummary(true);
       resetRun();
     } catch (err) {
@@ -258,8 +287,22 @@ export function MapScreen() {
             </div>
           </div>
 
+          {newAchievements.length > 0 && (
+            <div className="mb-8">
+              <p className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] font-semibold mb-3">Achievements Unlocked</p>
+              <div className="flex flex-wrap justify-center gap-2">
+                {newAchievements.map(achId => (
+                  <AchievementBadge key={achId} id={achId} size="md" />
+                ))}
+              </div>
+            </div>
+          )}
+
           <button
-            onClick={() => setShowSummary(false)}
+            onClick={() => {
+              setShowSummary(false);
+              setNewAchievements([]);
+            }}
             className="w-full rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-black px-4 py-4 text-xs font-bold uppercase tracking-[0.2em] hover:bg-slate-800 dark:hover:bg-slate-200 transition-all duration-300 shadow-[0_0_30px_rgba(0,0,0,0.15)] dark:shadow-[0_0_30px_rgba(255,255,255,0.15)] hover:scale-[0.98]"
           >
             Initialize Next Run
@@ -365,9 +408,9 @@ export function MapScreen() {
               }
 
               const initial = (territory.user?.displayName || 'U').charAt(0).toUpperCase();
-              const strength = territory.strength || 0;
-              const strengthLevel = Math.min(5, Math.max(1, Math.floor(strength / 100) + 1));
-              const pulseClass = strengthLevel >= 4 ? 'territory-pulse-fast' : strengthLevel <= 2 ? 'territory-pulse-slow' : 'territory-pulse';
+              const originalStrength = territory.strength || 0;
+              const strength = calculateDecayedStrength(originalStrength, territory.lastUpdated);
+              const strengthLevel = getStrengthLevel(strength);
 
               const labelIcon = L.divIcon({
                 className: 'bg-transparent border-none',
@@ -387,35 +430,56 @@ export function MapScreen() {
                 iconAnchor: [0, 0]
               });
               
-              // If the user is currently drawing a new territory, we hide their old one 
-              // to avoid visual overlap, or we can show both. Let's show both but make the old one slightly more transparent.
+              const level = Math.floor((territory.user?.totalDistance || 0) / 10) + 1;
+              const achs = territory.user?.achievements || [];
+
               return (
                 <React.Fragment key={territory.uid}>
                   <TerritoryPolygon 
                     positions={polyCoords}
                     color={color}
-                    strength={strengthLevel >= 4 ? 'high' : strengthLevel <= 2 ? 'low' : 'medium'}
+                    strength={strengthLevel}
                     isContested={false}
                     pathOptions={{
                       dashArray: isCurrentUser ? '5, 5' : undefined,
                     }}
                   >
-                    <Popup className="territory-popup">
-                      <div className="text-center p-1">
-                        <div className="flex items-center justify-center gap-2 mb-1">
-                          <div className="w-3 h-3 rounded-full" style={{ backgroundColor: color }}></div>
-                          <p className="font-bold text-slate-900 text-sm m-0">{territory.user?.displayName || 'Unknown Runner'}</p>
-                        </div>
-                        <div className="flex items-center justify-center gap-3 text-xs text-slate-600 mt-2">
-                          <div className="flex items-center gap-1">
-                            <Trophy className="w-3 h-3 text-yellow-500" />
-                            <span className="font-semibold">{strength}</span>
+                    <Popup className="modern-territory-popup" closeButton={false}>
+                      <div className="glass-panel bg-white/95 dark:bg-[#111]/95 backdrop-blur-xl p-4 rounded-2xl border border-black/10 dark:border-white/10 shadow-2xl min-w-[200px]">
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-inner shrink-0" style={{ backgroundColor: color }}>
+                            {initial}
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Square className="w-3 h-3 text-emerald-500" />
-                            <span>{Math.round(territory.areaKm2 * 1000000).toLocaleString()} m²</span>
+                          <div className="min-w-0">
+                            <h4 className="font-display font-bold text-slate-900 dark:text-white text-base leading-tight truncate">{territory.user?.displayName || 'Unknown'}</h4>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">Level {level} Runner</p>
                           </div>
                         </div>
+                        
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                          <div className="bg-black/5 dark:bg-white/5 rounded-xl p-2 text-center">
+                            <p className="text-[9px] uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5">Power</p>
+                            <p className="font-mono font-bold text-slate-900 dark:text-white text-sm" style={{ color }}>{strength}</p>
+                          </div>
+                          <div className="bg-black/5 dark:bg-white/5 rounded-xl p-2 text-center">
+                            <p className="text-[9px] uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-0.5">Distance</p>
+                            <p className="font-mono font-bold text-slate-900 dark:text-white text-sm">{(territory.user?.totalDistance || 0).toFixed(1)}<span className="text-[10px] text-slate-500 font-sans ml-0.5">km</span></p>
+                          </div>
+                        </div>
+
+                        {achs.length > 0 && (
+                          <div className="pt-2 border-t border-black/5 dark:border-white/5">
+                            <p className="text-[9px] uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Achievements</p>
+                            <div className="flex flex-wrap gap-1">
+                              {achs.slice(0, 3).map(achId => (
+                                <AchievementBadge key={achId} id={achId} size="sm" />
+                              ))}
+                              {achs.length > 3 && (
+                                <span className="text-[10px] text-slate-500 flex items-center pl-1 font-bold">+{achs.length - 3}</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </Popup>
                   </TerritoryPolygon>
@@ -546,7 +610,9 @@ export function MapScreen() {
               avatarUrl={userProfile.photoURL || undefined}
               totalDistance={userProfile.totalDistance || 0}
               totalRuns={userProfile.totalRuns || 0}
-              territoryControlled={Math.round(territoryArea)}
+              territoryControlled={Number(userTerritoryStats.totalArea.toFixed(2))}
+              avgStrength={userTerritoryStats.avgStrength}
+              achievements={userProfile.achievements || []}
               color={userProfile.territoryColor}
             />
           </div>

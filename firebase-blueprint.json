@@ -23,6 +23,10 @@
             "notifications": { "type": "boolean" },
             "publicProfile": { "type": "boolean" }
           }
+        },
+        "achievements": {
+          "type": "array",
+          "items": { "type": "string" }
         }
       },
       "required": ["uid", "displayName", "email", "territoryColor", "totalDistance", "territoryStrength", "lastActive", "wins", "losses"]

@@ -46,7 +46,7 @@ export const LeaderboardItem = React.forwardRef<HTMLDivElement, LeaderboardItemP
 
         <div className="flex-1 min-w-0">
           <h3 className="text-base font-semibold text-slate-900 dark:text-white truncate">{name}</h3>
-          <p className="text-xs text-slate-500 dark:text-white/50">Territory Controlled</p>
+          <p className="text-xs text-slate-500 dark:text-white/50">Empire Power</p>
         </div>
 
         <div className="text-right">
@@ -58,7 +58,7 @@ export const LeaderboardItem = React.forwardRef<HTMLDivElement, LeaderboardItemP
           >
             {score}
           </NeonText>
-          <p className="text-[10px] text-slate-400 dark:text-white/40 uppercase tracking-wider">sq km</p>
+          <p className="text-[10px] text-slate-400 dark:text-white/40 uppercase tracking-wider">PWR</p>
         </div>
       </GlassCard>
     );

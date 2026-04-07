@@ -15,6 +15,7 @@ export interface User {
     notifications: boolean;
     publicProfile: boolean;
   };
+  achievements?: string[];
 }
 
 export interface Coordinate {

@@ -1,16 +1,126 @@
 import { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { Territory, User } from '../types';
+import { Territory, User, Coordinate } from '../types';
 
 export interface EnrichedTerritory extends Territory {
   user?: User;
+}
+
+// Helper to generate a rough polygon around a center point
+function generateMockTerritory(centerLat: number, centerLng: number, radiusOffset: number): Coordinate[] {
+  const coords: Coordinate[] = [];
+  const points = 16; // More points for a smoother, organic shape
+  
+  // Generate a base radius and add some smooth noise
+  const noiseOffsets = Array.from({ length: points }, () => Math.random());
+  
+  // Smooth the noise so the polygon doesn't have sharp jagged edges
+  const smoothedOffsets = noiseOffsets.map((_, i, arr) => {
+    const prev = arr[(i - 1 + points) % points];
+    const next = arr[(i + 1) % points];
+    const current = arr[i];
+    return (prev + current * 2 + next) / 4;
+  });
+
+  for (let i = 0; i < points; i++) {
+    const angle = (i / points) * Math.PI * 2;
+    // Apply the smoothed noise to the radius (varying between 0.5x and 1.5x of base radius)
+    const r = radiusOffset * (0.5 + smoothedOffsets[i]);
+    
+    // Add a tiny bit of angular jitter for even more organic feel
+    const angleJitter = (Math.random() - 0.5) * 0.2;
+    
+    coords.push({
+      lat: centerLat + Math.cos(angle + angleJitter) * r,
+      lng: centerLng + Math.sin(angle + angleJitter) * r
+    });
+  }
+  return coords;
 }
 
 export function useGlobalData() {
   const [territories, setTerritories] = useState<Territory[]>([]);
   const [users, setUsers] = useState<Record<string, User>>({});
   const [loading, setLoading] = useState(true);
+  const [mockData, setMockData] = useState<{users: Record<string, User>, territories: Territory[]}>({ users: {}, territories: [] });
+
+  // Generate mock data based on user's location once
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((position) => {
+        const lat = position.coords.latitude;
+        const lng = position.coords.longitude;
+        
+        const mockUsers: Record<string, User> = {
+          'mock1': {
+            uid: 'mock1',
+            displayName: 'NeonGhost',
+            email: 'neon@example.com',
+            territoryColor: '#FF3CAC',
+            totalDistance: 42500,
+            territoryStrength: 850,
+            lastActive: new Date(),
+            wins: 12,
+            losses: 3,
+            photoURL: null
+          },
+          'mock2': {
+            uid: 'mock2',
+            displayName: 'CyberRunner',
+            email: 'cyber@example.com',
+            territoryColor: '#00E5FF',
+            totalDistance: 38200,
+            territoryStrength: 620,
+            lastActive: new Date(),
+            wins: 8,
+            losses: 5,
+            photoURL: null
+          },
+          'mock3': {
+            uid: 'mock3',
+            displayName: 'StreetNinja',
+            email: 'ninja@example.com',
+            territoryColor: '#FFB800',
+            totalDistance: 21000,
+            territoryStrength: 410,
+            lastActive: new Date(),
+            wins: 4,
+            losses: 2,
+            photoURL: null
+          }
+        };
+
+        const mockTerritories: Territory[] = [
+          {
+            uid: 'mock1',
+            coordinates: generateMockTerritory(lat + 0.002, lng + 0.002, 0.0015),
+            strength: 850,
+            lastUpdated: new Date(),
+            areaKm2: 0.85
+          },
+          {
+            uid: 'mock2',
+            coordinates: generateMockTerritory(lat - 0.003, lng + 0.001, 0.0012),
+            strength: 620,
+            lastUpdated: new Date(),
+            areaKm2: 0.62
+          },
+          {
+            uid: 'mock3',
+            coordinates: generateMockTerritory(lat + 0.001, lng - 0.003, 0.001),
+            strength: 410,
+            lastUpdated: new Date(),
+            areaKm2: 0.41
+          }
+        ];
+
+        setMockData({ users: mockUsers, territories: mockTerritories });
+      }, () => {
+        // Ignore errors, just don't generate mock data
+      });
+    }
+  }, []);
 
   useEffect(() => {
     let usersLoaded = false;
@@ -49,15 +159,28 @@ export function useGlobalData() {
   }, []);
 
   const enrichedTerritories = useMemo(() => {
-    return territories.map(t => ({
+    // Combine real and mock territories
+    const allTerritories = [...territories];
+    
+    // Add mock territories only if they don't conflict with real ones (by uid)
+    mockData.territories.forEach(mockTerr => {
+      if (!allTerritories.find(t => t.uid === mockTerr.uid)) {
+        allTerritories.push(mockTerr);
+      }
+    });
+
+    const allUsers = { ...mockData.users, ...users };
+
+    return allTerritories.map(t => ({
       ...t,
-      user: users[t.uid]
+      user: allUsers[t.uid]
     }));
-  }, [territories, users]);
+  }, [territories, users, mockData]);
 
   const leaderboardUsers = useMemo(() => {
-    return Object.values(users).sort((a, b) => b.totalDistance - a.totalDistance);
-  }, [users]);
+    const allUsers = { ...mockData.users, ...users };
+    return Object.values(allUsers).sort((a, b) => b.totalDistance - a.totalDistance);
+  }, [users, mockData]);
 
   return { territories: enrichedTerritories, leaderboardUsers, loading };
 }

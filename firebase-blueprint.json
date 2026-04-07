@@ -13,7 +13,17 @@
         "territoryStrength": { "type": "number" },
         "lastActive": { "type": "timestamp" },
         "wins": { "type": "number" },
-        "losses": { "type": "number" }
+        "losses": { "type": "number" },
+        "photoURL": { "type": "string" },
+        "totalRuns": { "type": "number" },
+        "preferences": {
+          "type": "object",
+          "properties": {
+            "units": { "type": "string", "enum": ["metric", "imperial"] },
+            "notifications": { "type": "boolean" },
+            "publicProfile": { "type": "boolean" }
+          }
+        }
       },
       "required": ["uid", "displayName", "email", "territoryColor", "totalDistance", "territoryStrength", "lastActive", "wins", "losses"]
     },

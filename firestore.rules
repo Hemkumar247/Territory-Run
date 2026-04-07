@@ -3,26 +3,47 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // ===============================================================
-    // Data Model
+    // Assumed Data Model
     // ===============================================================
     //
-    // /users/{userId}            - User profiles (owner r/w; others read public fields)
-    // /territories/{userId}      - Territory polygons (owner r/w; others read for map)
-    // /sessions/{sessionId}      - Run sessions (owner r/w; immutable after creation)
-    // /leaderboard/{seasonId}    - Leaderboard metadata (public read; admin-only write)
-    //   /entries/{uid}           - Ranked entries (public read; admin-only write)
-    // /alliances/{allianceId}    - Player alliances (members read; creator write)
-    // /events/{eventId}          - Game events (public read; admin-only write)
-    // /reports/{reportId}        - Player reports (auth write; admin-only read)
+    // Collection: users
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required, immutable) - user ID
+    //   - displayName: string (required) - user name
+    //   - email: string (required, immutable) - user email
+    //   - territoryColor: string (required) - hex color
+    //   - totalDistance: number (required) - total distance in meters
+    //   - territoryStrength: number (required) - calculated strength
+    //   - lastActive: timestamp (required) - last active time
+    //   - wins: number (required) - total wins
+    //   - losses: number (required) - total losses
     //
-    // "Admin" = a Firebase Auth user with custom claim { admin: true }
-    // set via the Admin SDK (Cloud Functions).
+    // Collection: territories
+    // Document ID: {userId}
+    // Fields:
+    //   - uid: string (required, immutable) - user ID
+    //   - coordinates: list of objects (required) - polygon points
+    //   - strength: number (required) - current strength
+    //   - lastUpdated: timestamp (required) - last update time
+    //   - areaKm2: number (required) - area in sq km
+    //
+    // Collection: sessions
+    // Document ID: {sessionId}
+    // Fields:
+    //   - uid: string (required, immutable) - user ID
+    //   - startTime: timestamp (required) - start time
+    //   - endTime: timestamp (required) - end time
+    //   - distanceCovered: number (required) - distance in meters
+    //   - coordinatesTrail: list of objects (required) - GPS trail
+    //   - territoryGained: number (required) - area gained
+    //   - territoryLost: number (required) - area lost
+    //
     // ===============================================================
 
     // ===============================================================
     // Helper Functions
     // ===============================================================
-
     function isAuthenticated() {
       return request.auth != null;
     }
@@ -31,10 +52,8 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    // A user is an admin when the Firebase Auth custom claim is set.
-    // Cloud Functions set this via admin.auth().setCustomUserClaims(uid, { admin: true }).
-    function isAdmin() {
-      return isAuthenticated() && request.auth.token.get('admin', false) == true;
+    function isDocOwner() {
+      return isAuthenticated() && request.auth.uid == resource.data.uid;
     }
 
     function uidUnchanged() {
@@ -43,6 +62,10 @@ service cloud.firestore {
 
     function uidNotModified() {
       return !('uid' in request.resource.data) || request.resource.data.uid == resource.data.uid;
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
     }
 
     function hasOnlyAllowedFields(fields) {
@@ -61,13 +84,8 @@ service cloud.firestore {
     // Domain Validators
     // ===============================================================
 
-    // Full user document: all fields including sensitive ones (email).
-    // Only the owner can write this shape.
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'displayName', 'email', 'territoryColor',
-                                   'totalDistance', 'territoryStrength', 'lastActive',
-                                   'wins', 'losses', 'city', 'photoURL',
-                                   'totalRuns', 'currentRank', 'fcmToken']) &&
+      return hasOnlyAllowedFields(['uid', 'displayName', 'email', 'territoryColor', 'totalDistance', 'territoryStrength', 'lastActive', 'wins', 'losses', 'photoURL', 'totalRuns', 'preferences']) &&
              data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
              data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
              data.email is string && isValidEmail(data.email) && data.email.size() < 150 &&
@@ -76,188 +94,84 @@ service cloud.firestore {
              data.territoryStrength is number && data.territoryStrength >= 0 &&
              data.lastActive is timestamp &&
              data.wins is number && data.wins >= 0 &&
-             data.losses is number && data.losses >= 0;
+             data.losses is number && data.losses >= 0 &&
+             (!('photoURL' in data) || data.photoURL == null || (data.photoURL is string && data.photoURL.size() < 500)) &&
+             (!('totalRuns' in data) || (data.totalRuns is number && data.totalRuns >= 0)) &&
+             (!('preferences' in data) || (
+               data.preferences is map &&
+               (!('units' in data.preferences) || data.preferences.units in ['metric', 'imperial']) &&
+               (!('notifications' in data.preferences) || data.preferences.notifications is bool) &&
+               (!('publicProfile' in data.preferences) || data.preferences.publicProfile is bool)
+             ));
     }
 
     function isValidTerritory(data) {
       return hasOnlyAllowedFields(['uid', 'coordinates', 'strength', 'lastUpdated', 'areaKm2']) &&
              data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
-             data.coordinates is list && data.coordinates.size() <= 1000 &&
+             data.coordinates is list && data.coordinates.size() <= 1000 && // Limit polygon complexity
              data.strength is number && data.strength >= 0 &&
              data.lastUpdated is timestamp &&
              data.areaKm2 is number && data.areaKm2 >= 0;
     }
 
     function isValidSession(data) {
-      return hasOnlyAllowedFields(['uid', 'startTime', 'endTime', 'distanceCovered',
-                                   'coordinatesTrail', 'territoryGained', 'territoryLost']) &&
+      return hasOnlyAllowedFields(['uid', 'startTime', 'endTime', 'distanceCovered', 'coordinatesTrail', 'territoryGained', 'territoryLost']) &&
              data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
              data.startTime is timestamp &&
              data.endTime is timestamp &&
              data.distanceCovered is number && data.distanceCovered >= 0 &&
-             data.coordinatesTrail is list && data.coordinatesTrail.size() <= 5000 &&
+             data.coordinatesTrail is list && data.coordinatesTrail.size() <= 5000 && // Limit trail complexity
              data.territoryGained is number && data.territoryGained >= 0 &&
              data.territoryLost is number && data.territoryLost >= 0;
     }
 
-    function isValidAllianceWrite(data) {
-      return data.name is string && data.name.size() > 0 && data.name.size() < 80 &&
-             data.creatorUid is string && data.creatorUid == request.auth.uid &&
-             data.members is list && data.members.size() <= 50 &&
-             data.maxMembers is number && data.maxMembers >= 2 && data.maxMembers <= 50;
-    }
-
-    function isValidReport(data) {
-      return hasOnlyAllowedFields(['reporterUid', 'reportedUid', 'reason', 'details',
-                                   'createdAt', 'status']) &&
-             data.reporterUid is string && data.reporterUid == request.auth.uid &&
-             data.reportedUid is string && data.reportedUid.size() > 0 &&
-             data.reason is string && data.reason.size() > 0 && data.reason.size() < 200 &&
-             (!('details' in data) || (data.details is string && data.details.size() < 1000)) &&
-             data.createdAt is timestamp &&
-             data.status is string && data.status == 'pending';
-    }
-
     // ===============================================================
-    // /users/{userId}
+    // Rules
     // ===============================================================
+
     match /users/{userId} {
-      // Any authenticated user can read profiles (needed for leaderboard & map).
-      // Sensitive fields (email, fcmToken) are excluded by the application layer;
-      // Firestore rules cannot enforce field-level read restrictions on individual gets.
+      // Users can read any profile (for leaderboard/map)
       allow read: if isAuthenticated();
-
+      
       // Only the owner can create their profile
-      allow create: if isOwner(userId) &&
-                       isValidUser(request.resource.data) &&
+      allow create: if isOwner(userId) && 
+                       isValidUser(request.resource.data) && 
                        uidUnchanged();
-
-      // Only the owner can update their profile; uid and email are immutable
-      allow update: if isOwner(userId) &&
-                       isValidUser(request.resource.data) &&
+                       
+      // Only the owner can update their profile
+      allow update: if isOwner(userId) && 
+                       isValidUser(request.resource.data) && 
                        uidNotModified() &&
-                       areImmutableFieldsUnchanged(['email']) ||
-                    // Cloud Functions (admin) may update rank, strength, wins, losses
-                    isAdmin();
-
-      allow delete: if false;
+                       areImmutableFieldsUnchanged(['email']);
     }
 
-    // ===============================================================
-    // /territories/{userId}
-    // ===============================================================
     match /territories/{userId} {
-      // All authenticated users can read to render the map
+      // Anyone can read territories to render the map
       allow read: if isAuthenticated();
-
+      
       // Only the owner can create/update their territory
-      allow create: if isOwner(userId) &&
-                       isValidTerritory(request.resource.data) &&
+      allow create: if isOwner(userId) && 
+                       isValidTerritory(request.resource.data) && 
                        uidUnchanged();
-
-      allow update: if isOwner(userId) &&
-                       isValidTerritory(request.resource.data) &&
-                       uidNotModified() ||
-                    // Cloud Functions may modify territories during conflict resolution
-                    isAdmin();
-
-      allow delete: if false;
+                       
+      allow update: if isOwner(userId) && 
+                       isValidTerritory(request.resource.data) && 
+                       uidNotModified();
     }
 
-    // ===============================================================
-    // /sessions/{sessionId}
-    // ===============================================================
     match /sessions/{sessionId} {
       // Users can only read their own sessions
       allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
-
+      
       // Only the owner can create a session
-      allow create: if isAuthenticated() &&
+      allow create: if isAuthenticated() && 
                        request.resource.data.uid == request.auth.uid &&
-                       isValidSession(request.resource.data) &&
+                       isValidSession(request.resource.data) && 
                        uidUnchanged();
-
-      // Sessions are immutable once created
+                       
+      // Sessions are immutable once created (no updates allowed)
       allow update: if false;
-      allow delete: if false;
-    }
-
-    // ===============================================================
-    // /leaderboard/{seasonId}   — metadata document
-    // /leaderboard/{seasonId}/entries/{uid}  — ranked entries
-    //
-    // Public read (leaderboards are displayed to all users).
-    // Write is restricted to Cloud Functions (admin SDK sets admin custom claim).
-    // ===============================================================
-    match /leaderboard/{seasonId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-
-      match /entries/{entryId} {
-        allow read: if isAuthenticated();
-        allow write: if isAdmin();
-      }
-    }
-
-    // ===============================================================
-    // /alliances/{allianceId}
-    //
-    // - Members (listed in data.members array) can read
-    // - Alliance creator can write (create/update)
-    // - Join requests: any authenticated user can append themselves
-    //   to data.pendingMembers (validated below)
-    // ===============================================================
-    match /alliances/{allianceId} {
-      // Only alliance members may read the full document
-      allow read: if isAuthenticated() &&
-                     (resource == null || request.auth.uid in resource.data.members);
-
-      // Only the alliance creator can create or fully update the alliance
-      allow create: if isAuthenticated() &&
-                       isValidAllianceWrite(request.resource.data);
-
-      allow update: if isAuthenticated() && (
-                      // Creator can do any update
-                      (resource.data.creatorUid == request.auth.uid &&
-                       isValidAllianceWrite(request.resource.data)) ||
-                      // Any authenticated user may add themselves to pendingMembers (join request)
-                      (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['pendingMembers']) &&
-                       request.auth.uid in request.resource.data.pendingMembers &&
-                       !(request.auth.uid in resource.data.members) &&
-                       request.resource.data.pendingMembers.size() <= 100)
-                    );
-
-      allow delete: if isAuthenticated() &&
-                       resource.data.creatorUid == request.auth.uid;
-    }
-
-    // ===============================================================
-    // /events/{eventId}
-    //
-    // Public read (events shown on the map/calendar).
-    // Only admins (Cloud Functions) can create or modify events.
-    // ===============================================================
-    match /events/{eventId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin();
-    }
-
-    // ===============================================================
-    // /reports/{reportId}
-    //
-    // Any authenticated user can submit a report (create only).
-    // Only admins can read and manage reports.
-    // ===============================================================
-    match /reports/{reportId} {
-      allow read: if isAdmin();
-
-      allow create: if isAuthenticated() &&
-                       isValidReport(request.resource.data);
-
-      // Reports are immutable once submitted (resolved by admin via Cloud Function)
-      allow update: if isAdmin();
       allow delete: if false;
     }
   }
 }
-

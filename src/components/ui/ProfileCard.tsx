@@ -29,7 +29,7 @@ export const ProfileCard = React.forwardRef<HTMLDivElement, ProfileCardProps>(
         {...props}
       >
         <div className="flex items-center gap-6">
-          <div className="relative w-24 h-24 rounded-full p-1" style={{ background: `linear-gradient(135deg, ${color}40, transparent)` }}>
+          <div className="relative w-24 h-24 rounded-full p-1 shrink-0" style={{ background: `linear-gradient(135deg, ${color}40, transparent)` }}>
             <div className="w-full h-full rounded-full overflow-hidden border-2" style={{ borderColor: color }}>
               {avatarUrl ? (
                 <img src={avatarUrl} alt={name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -39,13 +39,15 @@ export const ProfileCard = React.forwardRef<HTMLDivElement, ProfileCardProps>(
                 </div>
               )}
             </div>
-            <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 bg-white/90 dark:bg-black/80 border border-black/10 dark:border-white/20 rounded-full px-3 py-0.5 backdrop-blur-md">
-              <NeonText color={color} intensity="low" className="text-xs font-bold">Lvl {level}</NeonText>
-            </div>
           </div>
 
           <div className="flex-1 min-w-0">
-            <h2 className="text-2xl font-display font-bold text-slate-900 dark:text-white mb-1 truncate">{name}</h2>
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-2xl font-display font-bold text-slate-900 dark:text-white truncate pr-2">{name}</h2>
+              <div className="bg-white/90 dark:bg-black/80 border border-black/10 dark:border-white/20 rounded-full px-3 py-0.5 backdrop-blur-md shrink-0">
+                <NeonText color={color} intensity="low" className="text-xs font-bold">Lvl {level}</NeonText>
+              </div>
+            </div>
             <p className="text-sm text-slate-500 dark:text-white/60 mb-3 truncate">Urban Runner</p>
             
             <div className="w-full h-2 bg-black/5 dark:bg-white/10 rounded-full overflow-hidden">
@@ -66,7 +68,7 @@ export const ProfileCard = React.forwardRef<HTMLDivElement, ProfileCardProps>(
         <div className="grid grid-cols-3 gap-4">
           <StatsDisplay label="Distance" value={totalDistance} unit="km" colorClass="text-[#008B99] dark:text-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,139,153,0.8)] dark:drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]" />
           <StatsDisplay label="Runs" value={totalRuns} colorClass="text-[#B38000] dark:text-[#FFB800] drop-shadow-[0_0_8px_rgba(179,128,0,0.8)] dark:drop-shadow-[0_0_8px_rgba(255,184,0,0.8)]" />
-          <StatsDisplay label="Territory" value={territoryControlled} unit="m²" colorClass="text-[#B32A78] dark:text-[#FF3CAC] drop-shadow-[0_0_8px_rgba(179,42,120,0.8)] dark:drop-shadow-[0_0_8px_rgba(255,60,172,0.8)]" />
+          <StatsDisplay label="Territory" value={territoryControlled} unit="sq km" colorClass="text-[#B32A78] dark:text-[#FF3CAC] drop-shadow-[0_0_8px_rgba(179,42,120,0.8)] dark:drop-shadow-[0_0_8px_rgba(255,60,172,0.8)]" />
         </div>
       </GlassCard>
     );

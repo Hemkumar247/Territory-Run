@@ -39,6 +39,8 @@ export const TerritoryPolygon: React.FC<TerritoryPolygonProps> = ({
   return (
     <Polygon
       positions={positions}
+      color={color}
+      fillColor={color}
       pathOptions={{
         color: color,
         fillColor: color,

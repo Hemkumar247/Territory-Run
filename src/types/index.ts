@@ -10,6 +10,11 @@ export interface User {
   losses: number;
   photoURL?: string | null;
   totalRuns?: number;
+  preferences?: {
+    units: 'metric' | 'imperial';
+    notifications: boolean;
+    publicProfile: boolean;
+  };
 }
 
 export interface Coordinate {

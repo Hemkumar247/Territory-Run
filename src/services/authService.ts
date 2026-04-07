@@ -22,7 +22,6 @@ export const checkAndCreateUserProfile = async (user: FirebaseUser, customDispla
       const newUser = {
         uid: user.uid,
         displayName: customDisplayName || user.displayName || user.email?.split('@')[0] || 'Runner',
-        email: user.email || '',
         territoryColor: generateRandomColor(),
         totalDistance: 0,
         territoryStrength: 0,

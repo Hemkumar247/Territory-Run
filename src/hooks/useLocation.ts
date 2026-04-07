@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Coordinate } from '../types';
+import * as turf from '@turf/turf';
 
 interface LocationState {
   currentLocation: Coordinate | null;
@@ -10,6 +11,7 @@ interface LocationState {
   isPaused: boolean;
   startTime: number | null;
   elapsedTime: number;
+  totalDistanceCovered: number;
   startRun: () => void;
   pauseRun: () => void;
   resumeRun: () => void;
@@ -28,6 +30,7 @@ export function useLocation(): LocationState {
     isPaused: false,
     startTime: null,
     elapsedTime: 0,
+    totalDistanceCovered: 0,
   });
 
   const isRunningRef = useRef(false);
@@ -191,7 +194,18 @@ export function useLocation(): LocationState {
     isPausedRef.current = false;
     isSimulatingRef.current = false;
     if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
-    setState(s => ({ ...s, isRunning: false, isPaused: false }));
+    
+    setState(s => {
+      let distance = 0;
+      if (s.isTracking && !s.isPaused && s.trail.length > 1) {
+        for (let i = 1; i < s.trail.length; i++) {
+          const from = turf.point([s.trail[i - 1].lng, s.trail[i - 1].lat]);
+          const to = turf.point([s.trail[i].lng, s.trail[i].lat]);
+          distance += turf.distance(from, to, { units: 'kilometers' });
+        }
+      }
+      return { ...s, isRunning: false, isPaused: false, totalDistanceCovered: distance };
+    });
   }, []);
 
   const resetRun = useCallback(() => {
@@ -199,7 +213,7 @@ export function useLocation(): LocationState {
     isPausedRef.current = false;
     isSimulatingRef.current = false;
     if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
-    setState(s => ({ ...s, trail: [], isRunning: false, isPaused: false, startTime: null, elapsedTime: 0 }));
+    setState(s => ({ ...s, trail: [], isRunning: false, isPaused: false, startTime: null, elapsedTime: 0, totalDistanceCovered: 0 }));
   }, []);
 
   return { ...state, startRun, pauseRun, resumeRun, endRun, resetRun, simulateRun };

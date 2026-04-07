@@ -18,6 +18,7 @@ import { TerritoryPolygon } from './ui/TerritoryPolygon';
 import { ProfileCard } from './ui/ProfileCard';
 import { ProfileSettings } from './ProfileSettings';
 import { GeneralSettings } from './GeneralSettings';
+import { RunHistory } from './RunHistory';
 
 // Fix for default Leaflet icon missing in Vite/Webpack
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -81,12 +82,12 @@ function LocateMeButton({ currentLocation }: { currentLocation: any }) {
 
 export function MapScreen() {
   const { userProfile, authUser } = useFirebase();
-  const { currentLocation, trail, error, isTracking, isRunning, isPaused, elapsedTime, startRun, pauseRun, resumeRun, endRun, resetRun, simulateRun } = useLocation();
+  const { currentLocation, trail, error, isTracking, isRunning, isPaused, elapsedTime, totalDistanceCovered, startRun, pauseRun, resumeRun, endRun, resetRun, simulateRun } = useLocation();
   const { territories, leaderboardUsers, loading } = useGlobalData();
   
   const [isSaving, setIsSaving] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
-  const [activeTab, setActiveTab] = useState<'map' | 'leaderboard' | 'profile' | 'settings'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'leaderboard' | 'history' | 'profile' | 'settings'>('map');
   const [showWelcome, setShowWelcome] = useState(() => {
     return !sessionStorage.getItem('welcomeShown');
   });
@@ -518,6 +519,11 @@ export function MapScreen() {
         <div className="absolute inset-0 z-[2000] bg-slate-100 dark:bg-[#050505] overflow-y-auto pb-32 pt-8 px-4">
           <Leaderboard users={leaderboardUsers} onClose={() => setActiveTab('map')} />
         </div>
+      )}
+
+      {/* History Screen */}
+      {activeTab === 'history' && (
+        <RunHistory />
       )}
 
       {/* Profile Screen */}

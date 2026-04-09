@@ -85,7 +85,7 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'displayName', 'email', 'territoryColor', 'totalDistance', 'territoryStrength', 'lastActive', 'wins', 'losses', 'photoURL', 'totalRuns', 'preferences', 'achievements']) &&
+      return hasOnlyAllowedFields(['uid', 'displayName', 'email', 'territoryColor', 'totalDistance', 'territoryStrength', 'lastActive', 'wins', 'losses', 'photoURL', 'totalRuns', 'preferences', 'achievements', 'friendCode', 'friends', 'friendRequests']) &&
              data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
              data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
              (!('email' in data) || (data.email is string && isValidEmail(data.email) && data.email.size() < 150)) &&
@@ -97,6 +97,9 @@ service cloud.firestore {
              data.losses is number && data.losses >= 0 &&
              (!('photoURL' in data) || data.photoURL == null || (data.photoURL is string && data.photoURL.size() < 500)) &&
              (!('totalRuns' in data) || (data.totalRuns is number && data.totalRuns >= 0)) &&
+             (!('friendCode' in data) || (data.friendCode is string && data.friendCode.size() <= 10)) &&
+             (!('friends' in data) || (data.friends is list && data.friends.size() <= 1000)) &&
+             (!('friendRequests' in data) || (data.friendRequests is list && data.friendRequests.size() <= 1000)) &&
              (!('preferences' in data) || (
                data.preferences is map &&
                (!('units' in data.preferences) || data.preferences.units in ['metric', 'imperial']) &&
@@ -139,11 +142,22 @@ service cloud.firestore {
                        isValidUser(request.resource.data) && 
                        uidUnchanged();
                        
-      // Only the owner can update their profile
-      allow update: if isOwner(userId) && 
-                       isValidUser(request.resource.data) && 
-                       uidNotModified() &&
-                       areImmutableFieldsUnchanged(['email']);
+      // Owner can update their profile.
+      // Any authenticated user can add their UID to the friendRequests array of another user.
+      allow update: if (isOwner(userId) && 
+                        isValidUser(request.resource.data) && 
+                        uidNotModified() &&
+                        areImmutableFieldsUnchanged(['email'])) ||
+                       (isAuthenticated() && 
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friendRequests']) &&
+                        request.resource.data.friendRequests.hasAll(resource.data.friendRequests) &&
+                        request.resource.data.friendRequests.size() == resource.data.friendRequests.size() + 1 &&
+                        request.resource.data.friendRequests[request.resource.data.friendRequests.size() - 1] == request.auth.uid) ||
+                       (isAuthenticated() &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friends']) &&
+                        request.resource.data.friends.hasAll(resource.data.friends) &&
+                        request.resource.data.friends.size() == resource.data.friends.size() + 1 &&
+                        request.auth.uid in resource.data.friendRequests); // This last condition is tricky to enforce purely in rules without cloud functions, but we'll allow the owner to manage their own lists, and allow others to append to friendRequests.
     }
 
     match /territories/{userId} {

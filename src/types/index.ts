@@ -10,6 +10,9 @@ export interface User {
   losses: number;
   photoURL?: string | null;
   totalRuns?: number;
+  friendCode?: string;
+  friends?: string[];
+  friendRequests?: string[];
   preferences?: {
     units: 'metric' | 'imperial';
     notifications: boolean;

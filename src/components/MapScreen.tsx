@@ -20,6 +20,7 @@ import { ProfileCard } from './ui/ProfileCard';
 import { ProfileSettings } from './ProfileSettings';
 import { GeneralSettings } from './GeneralSettings';
 import { RunHistory } from './RunHistory';
+import { SocialScreen } from './SocialScreen';
 
 // Fix for default Leaflet icon missing in Vite/Webpack
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -114,7 +115,7 @@ export function MapScreen() {
   
   const [isSaving, setIsSaving] = useState(false);
   const [showSummary, setShowSummary] = useState(false);
-  const [activeTab, setActiveTab] = useState<'map' | 'leaderboard' | 'history' | 'profile' | 'settings'>('map');
+  const [activeTab, setActiveTab] = useState<'map' | 'leaderboard' | 'history' | 'profile' | 'settings' | 'social'>('map');
   const [showWelcome, setShowWelcome] = useState(() => {
     return !sessionStorage.getItem('welcomeShown');
   });
@@ -661,6 +662,11 @@ export function MapScreen() {
       {/* History Screen */}
       {activeTab === 'history' && (
         <RunHistory />
+      )}
+
+      {/* Social Screen */}
+      {activeTab === 'social' && (
+        <SocialScreen onClose={() => setActiveTab('map')} />
       )}
 
       {/* Profile Screen */}

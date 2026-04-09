@@ -16,6 +16,15 @@
         "losses": { "type": "number" },
         "photoURL": { "type": "string" },
         "totalRuns": { "type": "number" },
+        "friendCode": { "type": "string" },
+        "friends": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "friendRequests": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
         "preferences": {
           "type": "object",
           "properties": {

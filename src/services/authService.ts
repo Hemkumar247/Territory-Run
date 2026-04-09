@@ -6,9 +6,14 @@ import {
   signOut, 
   User as FirebaseUser 
 } from 'firebase/auth';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, updateDoc } from 'firebase/firestore';
 import { generateRandomColor } from '../lib/utils';
 import { handleFirestoreError, OperationType } from '../lib/errors';
+
+export const generateFriendCode = () => {
+  // Generate a random 6-character alphanumeric code
+  return Math.random().toString(36).substring(2, 8).toUpperCase();
+};
 
 /**
  * Checks if a user profile exists in Firestore, and creates one if it doesn't.
@@ -27,10 +32,23 @@ export const checkAndCreateUserProfile = async (user: FirebaseUser, customDispla
         territoryStrength: 0,
         lastActive: serverTimestamp(),
         wins: 0,
-        losses: 0
+        losses: 0,
+        friendCode: generateFriendCode(),
+        friends: [],
+        friendRequests: []
       };
       
       await setDoc(userRef, newUser);
+    } else {
+      // Backwards compatibility: add friendCode if it doesn't exist
+      const data = docSnap.data();
+      if (!data.friendCode) {
+        await updateDoc(userRef, {
+          friendCode: generateFriendCode(),
+          friends: data.friends || [],
+          friendRequests: data.friendRequests || []
+        });
+      }
     }
   } catch (error) {
     handleFirestoreError(error, OperationType.CREATE, `users/${user.uid}`);

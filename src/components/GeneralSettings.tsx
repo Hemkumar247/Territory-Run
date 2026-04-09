@@ -3,6 +3,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useFirebase } from './FirebaseProvider';
 import { Bell, Globe, Ruler } from 'lucide-react';
+import { requestNotificationPermission } from '../services/notificationService';
 
 export function GeneralSettings() {
   const { authUser, userProfile } = useFirebase();
@@ -21,6 +22,16 @@ export function GeneralSettings() {
       });
     } catch (error) {
       console.error(`Error updating ${field}:`, error);
+    }
+  };
+
+  const handleNotificationToggle = async () => {
+    const newVal = !notifications;
+    setNotifications(newVal);
+    handleToggle('notifications', newVal);
+    
+    if (newVal) {
+      await requestNotificationPermission();
     }
   };
 
@@ -67,7 +78,7 @@ export function GeneralSettings() {
           </div>
         </div>
         <button
-          onClick={() => { const newVal = !notifications; setNotifications(newVal); handleToggle('notifications', newVal); }}
+          onClick={handleNotificationToggle}
           className={`w-12 h-6 rounded-full transition-colors relative ${notifications ? 'bg-teal-500' : 'bg-slate-300 dark:bg-slate-600'}`}
         >
           <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${notifications ? 'left-7' : 'left-1'}`} />

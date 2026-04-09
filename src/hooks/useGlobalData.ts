@@ -3,6 +3,7 @@ import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { Territory, User, Coordinate } from '../types';
 import { calculateDecayedStrength } from '../lib/utils';
+import { handleFirestoreError, OperationType } from '../lib/errors';
 
 export interface EnrichedTerritory extends Territory {
   user?: User;
@@ -57,7 +58,6 @@ export function useGlobalData() {
           'mock1': {
             uid: 'mock1',
             displayName: 'NeonGhost',
-            email: 'neon@example.com',
             territoryColor: '#FF3CAC',
             totalDistance: 42500,
             territoryStrength: 850,
@@ -69,7 +69,6 @@ export function useGlobalData() {
           'mock2': {
             uid: 'mock2',
             displayName: 'CyberRunner',
-            email: 'cyber@example.com',
             territoryColor: '#00E5FF',
             totalDistance: 38200,
             territoryStrength: 620,
@@ -81,7 +80,6 @@ export function useGlobalData() {
           'mock3': {
             uid: 'mock3',
             displayName: 'StreetNinja',
-            email: 'ninja@example.com',
             territoryColor: '#FFB800',
             totalDistance: 21000,
             territoryStrength: 410,
@@ -141,6 +139,8 @@ export function useGlobalData() {
       setUsers(usersData);
       usersLoaded = true;
       checkLoading();
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'users');
     });
 
     const unsubTerritories = onSnapshot(collection(db, 'territories'), (snapshot) => {
@@ -151,6 +151,8 @@ export function useGlobalData() {
       setTerritories(terrData);
       territoriesLoaded = true;
       checkLoading();
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'territories');
     });
 
     return () => {

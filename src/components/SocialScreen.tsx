@@ -119,7 +119,7 @@ export function SocialScreen({ onClose }: { onClose: () => void }) {
       return;
     }
 
-    await sendFriendRequest(authUser.uid, searchResult.uid);
+    await sendFriendRequest(authUser.uid, searchResult.uid, userProfile?.displayName || 'A runner');
     setSearchResult(null);
     setSearchCode('');
     // Show some success feedback (could use a toast here)

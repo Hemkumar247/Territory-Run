@@ -19,14 +19,21 @@ export function RunHistory() {
       try {
         const q = query(
           collection(db, 'sessions'),
-          where('uid', '==', authUser.uid),
-          orderBy('startTime', 'desc')
+          where('uid', '==', authUser.uid)
         );
         const snapshot = await getDocs(q);
         const fetchedSessions = snapshot.docs.map(doc => ({
           ...doc.data(),
           id: doc.id
         })) as unknown as Session[];
+        
+        // Sort locally to avoid needing a composite index
+        fetchedSessions.sort((a, b) => {
+          const timeA = a.startTime?.toMillis ? a.startTime.toMillis() : (a.startTime as any)?.seconds * 1000 || 0;
+          const timeB = b.startTime?.toMillis ? b.startTime.toMillis() : (b.startTime as any)?.seconds * 1000 || 0;
+          return timeB - timeA;
+        });
+        
         setSessions(fetchedSessions);
       } catch (error) {
         console.error("Error fetching run history:", error);

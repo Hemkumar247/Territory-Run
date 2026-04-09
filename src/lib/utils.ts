@@ -36,3 +36,12 @@ export function getStrengthLevel(strength: number): 'low' | 'medium' | 'high' {
   if (strength > 30) return 'medium';
   return 'low';
 }
+
+export function escapeHtml(unsafe: string): string {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}

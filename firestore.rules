@@ -85,10 +85,9 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return hasOnlyAllowedFields(['uid', 'displayName', 'email', 'territoryColor', 'totalDistance', 'territoryStrength', 'lastActive', 'wins', 'losses', 'photoURL', 'totalRuns', 'preferences', 'achievements', 'friendCode', 'friends', 'friendRequests']) &&
+      return hasOnlyAllowedFields(['uid', 'displayName', 'territoryColor', 'totalDistance', 'territoryStrength', 'lastActive', 'wins', 'losses', 'photoURL', 'totalRuns', 'preferences', 'achievements', 'friendCode', 'friends', 'friendRequests']) &&
              data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
              data.displayName is string && data.displayName.size() > 0 && data.displayName.size() < 100 &&
-             (!('email' in data) || (data.email is string && isValidEmail(data.email) && data.email.size() < 150)) &&
              data.territoryColor is string && data.territoryColor.size() == 7 &&
              data.totalDistance is number && data.totalDistance >= 0 &&
              data.territoryStrength is number && data.territoryStrength >= 0 &&
@@ -129,6 +128,16 @@ service cloud.firestore {
              data.territoryLost is number && data.territoryLost >= 0;
     }
 
+    function isValidNotification(data) {
+      return hasOnlyAllowedFields(['id', 'type', 'message', 'timestamp', 'read', 'relatedUserId']) &&
+             data.id is string && data.id.size() > 0 && data.id.size() < 100 &&
+             data.type in ['friend_request', 'territory_contested', 'territory_lost'] &&
+             data.message is string && data.message.size() > 0 && data.message.size() < 500 &&
+             data.timestamp is timestamp &&
+             data.read is bool &&
+             (!('relatedUserId' in data) || (data.relatedUserId is string && data.relatedUserId.size() < 100));
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -146,8 +155,7 @@ service cloud.firestore {
       // Any authenticated user can add their UID to the friendRequests array of another user.
       allow update: if (isOwner(userId) && 
                         isValidUser(request.resource.data) && 
-                        uidNotModified() &&
-                        areImmutableFieldsUnchanged(['email'])) ||
+                        uidNotModified()) ||
                        (isAuthenticated() && 
                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friendRequests']) &&
                         request.resource.data.friendRequests.hasAll(resource.data.friendRequests) &&
@@ -157,7 +165,25 @@ service cloud.firestore {
                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friends']) &&
                         request.resource.data.friends.hasAll(resource.data.friends) &&
                         request.resource.data.friends.size() == resource.data.friends.size() + 1 &&
-                        request.auth.uid in resource.data.friendRequests); // This last condition is tricky to enforce purely in rules without cloud functions, but we'll allow the owner to manage their own lists, and allow others to append to friendRequests.
+                        request.auth.uid in resource.data.friendRequests) ||
+                       (isAuthenticated() &&
+                        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friends']) &&
+                        resource.data.friends.hasAll(request.resource.data.friends) &&
+                        resource.data.friends.size() == request.resource.data.friends.size() + 1 &&
+                        !(request.auth.uid in request.resource.data.friends) &&
+                        request.auth.uid in resource.data.friends);
+                        
+      match /notifications/{notificationId} {
+        // Owner can read their notifications
+        allow read: if isOwner(userId);
+        
+        // Anyone authenticated can create a notification for a user
+        allow create: if isAuthenticated() && isValidNotification(request.resource.data);
+        
+        // Owner can update (e.g., mark as read) or delete their notifications
+        allow update: if isOwner(userId) && isValidNotification(request.resource.data);
+        allow delete: if isOwner(userId);
+      }
     }
 
     match /territories/{userId} {

@@ -1,7 +1,6 @@
 export interface User {
   uid: string;
   displayName: string;
-  email: string;
   territoryColor: string;
   totalDistance: number;
   territoryStrength: number;

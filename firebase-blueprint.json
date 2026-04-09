@@ -7,7 +7,6 @@
       "properties": {
         "uid": { "type": "string" },
         "displayName": { "type": "string" },
-        "email": { "type": "string", "format": "email" },
         "territoryColor": { "type": "string" },
         "totalDistance": { "type": "number" },
         "territoryStrength": { "type": "number" },
@@ -38,7 +37,7 @@
           "items": { "type": "string" }
         }
       },
-      "required": ["uid", "displayName", "email", "territoryColor", "totalDistance", "territoryStrength", "lastActive", "wins", "losses"]
+      "required": ["uid", "displayName", "territoryColor", "totalDistance", "territoryStrength", "lastActive", "wins", "losses"]
     },
     "Territory": {
       "title": "Territory",
@@ -88,12 +87,30 @@
         "territoryLost": { "type": "number" }
       },
       "required": ["uid", "startTime", "endTime", "distanceCovered", "coordinatesTrail", "territoryGained", "territoryLost"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "In-app notification for a user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string", "enum": ["friend_request", "territory_contested", "territory_lost"] },
+        "message": { "type": "string" },
+        "timestamp": { "type": "timestamp" },
+        "read": { "type": "boolean" },
+        "relatedUserId": { "type": "string" }
+      },
+      "required": ["id", "type", "message", "timestamp", "read"]
     }
   },
   "firestore": {
     "/users/{userId}": {
       "schema": { "$ref": "#/entities/User" },
       "description": "User profiles"
+    },
+    "/users/{userId}/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/Notification" },
+      "description": "User notifications"
     },
     "/territories/{userId}": {
       "schema": { "$ref": "#/entities/Territory" },

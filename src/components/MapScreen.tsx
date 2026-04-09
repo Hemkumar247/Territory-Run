@@ -10,7 +10,7 @@ import { saveRunSession } from '../services/runService';
 import { Leaderboard } from './Leaderboard';
 import { WelcomeModal } from './WelcomeModal';
 import * as turf from '@turf/turf';
-import { calculateDecayedStrength, getStrengthLevel } from '../lib/utils';
+import { calculateDecayedStrength, getStrengthLevel, escapeHtml } from '../lib/utils';
 
 import { NavigationTabBar } from './ui/NavigationTabBar';
 import { BottomHUD } from './ui/BottomHUD';
@@ -268,6 +268,52 @@ export function MapScreen() {
   };
 
   const [newAchievements, setNewAchievements] = useState<string[]>([]);
+  const notifiedUsersRef = React.useRef<Set<string>>(new Set());
+
+  // Reset notified users when starting a new run
+  useEffect(() => {
+    if (!isRunning) {
+      notifiedUsersRef.current.clear();
+    }
+  }, [isRunning]);
+
+  // Check for contested territories during a run
+  useEffect(() => {
+    if (!isRunning || !territoryPolygon || !authUser || !userProfile) return;
+
+    try {
+      const currentPolyCoords = territoryPolygon.map(p => [p[1], p[0]]);
+      currentPolyCoords.push([...currentPolyCoords[0]]);
+      const currentPoly = turf.polygon([currentPolyCoords]);
+
+      visibleTerritories.forEach(t => {
+        if (t.uid === authUser.uid) return; // Don't contest yourself
+        if (notifiedUsersRef.current.has(t.uid)) return; // Already notified this run
+
+        if (t.coordinates.length >= 3) {
+          const tCoords = t.coordinates.map(c => [c.lng, c.lat]);
+          tCoords.push([...tCoords[0]]);
+          const tPoly = turf.polygon([tCoords]);
+
+          const intersection = turf.intersect(turf.featureCollection([currentPoly, tPoly]));
+          if (intersection) {
+            // Send notification
+            import('../services/notificationService').then(({ sendNotification }) => {
+              sendNotification(
+                t.uid,
+                'territory_contested',
+                `${userProfile.displayName} is contesting your territory!`,
+                authUser.uid
+              );
+            });
+            notifiedUsersRef.current.add(t.uid);
+          }
+        }
+      });
+    } catch (e) {
+      // Ignore turf errors from invalid polygons
+    }
+  }, [territoryPolygon, visibleTerritories, isRunning, authUser, userProfile]);
 
   const handleFinishRun = async () => {
     if (!authUser || !userProfile) return;
@@ -288,6 +334,20 @@ export function MapScreen() {
         territoryPolygon,
         territoryArea
       );
+      
+      // Send territory_lost notifications to users we contested
+      if (territoryPolygon && territoryPolygon.length >= 3) {
+        import('../services/notificationService').then(({ sendNotification }) => {
+          notifiedUsersRef.current.forEach(targetUid => {
+            sendNotification(
+              targetUid,
+              'territory_lost',
+              `${userProfile.displayName} has claimed part of your territory!`,
+              authUser.uid
+            );
+          });
+        });
+      }
       
       setSummaryData({ distance, area: territoryArea });
       if (unlockedAchievements && unlockedAchievements.length > 0) {
@@ -468,12 +528,12 @@ export function MapScreen() {
                 html: `
                   <div class="territory-label">
                     <div class="relative flex items-center justify-center w-6 h-6 rounded-full text-white text-xs font-bold shadow-inner" style="background-color: ${color}">
-                      ${initial}
+                      ${escapeHtml(initial)}
                       <div class="absolute -bottom-1 -right-1 bg-slate-900 rounded-full p-0.5 border border-slate-700 shadow-sm flex items-center justify-center">
                         ${getTerritoryBadgeSVG(territory.user)}
                       </div>
                     </div>
-                    <span class="px-1.5 font-display font-bold tracking-tight text-white drop-shadow-md">${territory.user?.displayName || 'Unknown'}</span>
+                    <span class="px-1.5 font-display font-bold tracking-tight text-white drop-shadow-md">${escapeHtml(territory.user?.displayName || 'Unknown')}</span>
                     <div class="flex items-center gap-0.5 bg-black/40 backdrop-blur-sm rounded-full px-1.5 py-0.5 ml-0.5 border border-white/10">
                       <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-yellow-500"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>
                       <span class="text-[9px] font-bold text-white">${strength}</span>
@@ -566,7 +626,7 @@ export function MapScreen() {
                         <AlertTriangle className="w-6 h-6 text-white mx-auto mb-1" />
                         <h4 className="font-display font-bold text-white text-sm uppercase tracking-wider">Contested Zone</h4>
                         <p className="text-[10px] text-red-100 font-medium mt-1">
-                          {zone.users[0]?.displayName || 'Unknown'} vs {zone.users[1]?.displayName || 'Unknown'}
+                          {escapeHtml(zone.users[0]?.displayName || 'Unknown')} vs {escapeHtml(zone.users[1]?.displayName || 'Unknown')}
                         </p>
                       </div>
                     </Popup>

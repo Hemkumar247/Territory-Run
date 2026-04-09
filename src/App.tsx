@@ -7,6 +7,35 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { FirebaseProvider, useFirebase } from './components/FirebaseProvider';
 import { AuthScreen } from './components/AuthScreen';
 import { MapScreen } from './components/MapScreen';
+import { useEffect } from 'react';
+import { requestNotificationPermission, listenToNotifications, markNotificationAsRead } from './services/notificationService';
+
+function NotificationListener() {
+  const { authUser, userProfile } = useFirebase();
+
+  useEffect(() => {
+    if (!authUser) return;
+
+    // Request permission on load if logged in and enabled in preferences
+    if (userProfile?.preferences?.notifications !== false) {
+      requestNotificationPermission();
+    }
+
+    const shouldShow = userProfile?.preferences?.notifications !== false;
+
+    const unsubscribe = listenToNotifications(authUser.uid, shouldShow, (notifications) => {
+      notifications.forEach(notif => {
+        setTimeout(() => {
+          markNotificationAsRead(authUser.uid, notif.id);
+        }, 5000);
+      });
+    });
+
+    return () => unsubscribe();
+  }, [authUser, userProfile?.preferences?.notifications]);
+
+  return null;
+}
 
 function Main() {
   const { isAuthReady, authUser } = useFirebase();
@@ -23,7 +52,12 @@ function Main() {
     return <AuthScreen />;
   }
 
-  return <MapScreen />;
+  return (
+    <>
+      <NotificationListener />
+      <MapScreen />
+    </>
+  );
 }
 
 export default function App() {

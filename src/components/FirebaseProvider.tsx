@@ -3,6 +3,7 @@ import { User as FirebaseAuthUser, onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { doc, getDocFromServer, onSnapshot } from 'firebase/firestore';
 import { User as CustomUser } from '../types';
+import { handleFirestoreError, OperationType } from '../lib/errors';
 
 interface FirebaseContextType {
   authUser: FirebaseAuthUser | null;
@@ -56,7 +57,7 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
       setIsAuthReady(true);
     }, (error) => {
-      console.error("Error fetching user profile:", error);
+      handleFirestoreError(error, OperationType.GET, `users/${authUser.uid}`);
       setIsAuthReady(true);
     });
 

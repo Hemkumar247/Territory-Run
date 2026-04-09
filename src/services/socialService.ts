@@ -3,6 +3,8 @@ import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRem
 import { User } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/errors';
 
+import { sendNotification } from './notificationService';
+
 export const getUserByFriendCode = async (code: string): Promise<User | null> => {
   try {
     const q = query(collection(db, 'users'), where('friendCode', '==', code.toUpperCase()));
@@ -27,12 +29,19 @@ export const getUserByUid = async (uid: string): Promise<User | null> => {
   }
 };
 
-export const sendFriendRequest = async (currentUserId: string, targetUserId: string) => {
+export const sendFriendRequest = async (currentUserId: string, targetUserId: string, currentUserName: string) => {
   try {
     const targetRef = doc(db, 'users', targetUserId);
     await updateDoc(targetRef, {
       friendRequests: arrayUnion(currentUserId)
     });
+    
+    await sendNotification(
+      targetUserId,
+      'friend_request',
+      `${currentUserName} sent you a friend request!`,
+      currentUserId
+    );
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `users/${targetUserId}`);
   }

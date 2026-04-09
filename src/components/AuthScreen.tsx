@@ -141,7 +141,7 @@ export function AuthScreen() {
               <div className="w-full border-t border-black/10 dark:border-white/10" />
             </div>
             <div className="relative flex justify-center text-xs uppercase tracking-widest">
-              <span className="bg-slate-100 dark:bg-[#1a1a1a] px-4 text-slate-600 rounded-full border border-black/5 dark:border-white/5">Or continue with</span>
+              <span className="bg-white/80 dark:bg-black/60 backdrop-blur-md px-4 py-1 text-slate-600 dark:text-slate-400 rounded-full border border-black/5 dark:border-white/5">Or continue with</span>
             </div>
           </div>
 

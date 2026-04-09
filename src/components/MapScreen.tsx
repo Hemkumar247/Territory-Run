@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, useMap, ZoomControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, useMap, ZoomControl, GeoJSON } from 'react-leaflet';
 import L from 'leaflet';
 import { useLocation } from '../hooks/useLocation';
 import { useFirebase } from './FirebaseProvider';
@@ -183,6 +183,43 @@ export function MapScreen() {
       return dist <= 5;
     });
   }, [territories, currentLocation, loading, authUser]);
+
+  // Calculate Contested Zones (Intersections)
+  const contestedZones = useMemo(() => {
+    const zones: { id: string; geometry: any; users: any[] }[] = [];
+    if (visibleTerritories.length < 2) return zones;
+
+    for (let i = 0; i < visibleTerritories.length; i++) {
+      for (let j = i + 1; j < visibleTerritories.length; j++) {
+        const t1 = visibleTerritories[i];
+        const t2 = visibleTerritories[j];
+
+        if (t1.coordinates.length >= 3 && t2.coordinates.length >= 3) {
+          try {
+            const coords1 = t1.coordinates.map(c => [c.lng, c.lat]);
+            coords1.push([...coords1[0]]);
+            const poly1 = turf.polygon([coords1]);
+
+            const coords2 = t2.coordinates.map(c => [c.lng, c.lat]);
+            coords2.push([...coords2[0]]);
+            const poly2 = turf.polygon([coords2]);
+
+            const intersection = turf.intersect(turf.featureCollection([poly1, poly2]));
+            if (intersection) {
+              zones.push({
+                id: `${t1.uid}-${t2.uid}`,
+                geometry: intersection.geometry,
+                users: [t1.user, t2.user]
+              });
+            }
+          } catch (e) {
+            console.error("Error calculating intersection:", e);
+          }
+        }
+      }
+    }
+    return zones;
+  }, [visibleTerritories]);
 
   // Calculate Distance and Territory using Turf.js
   const { distance, territoryArea, territoryPolygon } = useMemo(() => {
@@ -504,6 +541,38 @@ export function MapScreen() {
                   )}
                 </React.Fragment>
               );
+            })}
+
+            {/* Contested Zones */}
+            {contestedZones.map((zone) => {
+              if (zone.geometry.type === 'Polygon') {
+                const positions = zone.geometry.coordinates[0].map((c: number[]) => [c[1], c[0]] as [number, number]);
+                return (
+                  <Polygon
+                    key={zone.id}
+                    positions={positions}
+                    pathOptions={{
+                      color: '#ef4444',
+                      fillColor: '#ef4444',
+                      fillOpacity: 0.6,
+                      weight: 2,
+                      dashArray: '4, 4',
+                      className: 'animate-pulse'
+                    }}
+                  >
+                    <Popup className="modern-territory-popup" closeButton={false}>
+                      <div className="glass-panel bg-red-500/90 backdrop-blur-xl p-3 rounded-2xl border border-red-400/50 shadow-2xl min-w-[150px] text-center">
+                        <AlertTriangle className="w-6 h-6 text-white mx-auto mb-1" />
+                        <h4 className="font-display font-bold text-white text-sm uppercase tracking-wider">Contested Zone</h4>
+                        <p className="text-[10px] text-red-100 font-medium mt-1">
+                          {zone.users[0]?.displayName || 'Unknown'} vs {zone.users[1]?.displayName || 'Unknown'}
+                        </p>
+                      </div>
+                    </Popup>
+                  </Polygon>
+                );
+              }
+              return null;
             })}
 
             {/* User's actively claimed territory polygon (being drawn) */}

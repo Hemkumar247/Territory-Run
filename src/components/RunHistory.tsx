@@ -26,7 +26,7 @@ export function RunHistory() {
         const fetchedSessions = snapshot.docs.map(doc => ({
           ...doc.data(),
           id: doc.id
-        })) as Session[];
+        })) as unknown as Session[];
         setSessions(fetchedSessions);
       } catch (error) {
         console.error("Error fetching run history:", error);

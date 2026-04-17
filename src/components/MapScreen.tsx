@@ -464,19 +464,38 @@ export function MapScreen() {
 
       {/* Map Container */}
       <div className="flex-1 w-full relative z-0">
-        {!currentLocation && !error ? (
+        {!currentLocation ? (
           <div className="h-full w-full flex flex-col items-center justify-center bg-slate-100 dark:bg-[#050505] text-slate-600 dark:text-slate-400 relative overflow-hidden">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-emerald-500/10 rounded-full blur-[120px] mix-blend-screen pointer-events-none" />
+            <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-[120px] mix-blend-screen pointer-events-none ${error ? 'bg-red-500/10' : 'bg-emerald-500/10'}`} />
             
-            <div className="relative z-10 flex flex-col items-center">
-              <div className="w-24 h-24 rounded-full border border-black/10 dark:border-white/10 flex items-center justify-center mb-8 bg-black/5 dark:bg-white/5 shadow-[0_0_30px_rgba(0,0,0,0.05)] dark:shadow-[0_0_30px_rgba(255,255,255,0.05)]">
-                <Navigation className="h-10 w-10 animate-bounce text-emerald-500 dark:text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)]" />
+            <div className="relative z-10 flex flex-col items-center text-center p-8 glass-panel bg-white/50 dark:bg-black/20 rounded-3xl max-w-[80%] border border-black/5 dark:border-white/5">
+              <div className={`w-24 h-24 rounded-full border border-black/10 dark:border-white/10 flex items-center justify-center mb-6 bg-black/5 dark:bg-white/5 shadow-[0_0_30px_rgba(0,0,0,0.05)] ${error ? 'dark:shadow-[0_0_30px_rgba(239,68,68,0.15)]' : 'dark:shadow-[0_0_30px_rgba(255,255,255,0.05)]'}`}>
+                {error ? (
+                  <AlertTriangle className="h-10 w-10 text-red-500 dark:text-red-400 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]" />
+                ) : (
+                  <Navigation className="h-10 w-10 animate-bounce text-emerald-500 dark:text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)]" />
+                )}
               </div>
-              <p className="text-xs font-bold tracking-[0.3em] uppercase text-slate-600 dark:text-slate-300 mb-2">Acquiring Satellites</p>
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400 tracking-wide">Establishing secure connection...</p>
+              
+              <p className={`text-xs font-bold tracking-[0.3em] uppercase mb-2 ${error ? 'text-red-500 dark:text-red-400' : 'text-slate-600 dark:text-slate-300'}`}>
+                {error ? 'Location Blocked' : 'Acquiring Satellites'}
+              </p>
+              
+              <p className="text-sm font-medium text-slate-600 dark:text-slate-400 tracking-wide mb-6">
+                {error ? 'Please grant location permissions to play automatically, or use the simulation.' : 'Establishing secure connection...'}
+              </p>
+              
+              {error && (
+                <button
+                  onClick={simulateRun}
+                  className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-full font-bold uppercase tracking-widest text-xs hover:scale-105 transition-transform shadow-xl flex items-center gap-2"
+                >
+                  <Play className="w-4 h-4 fill-current" /> Try Simulation
+                </button>
+              )}
             </div>
           </div>
-        ) : currentLocation ? (
+        ) : (
           <MapContainer 
             center={[currentLocation.lat, currentLocation.lng]} 
             zoom={16} 
@@ -675,7 +694,7 @@ export function MapScreen() {
               />
             )}
           </MapContainer>
-        ) : null}
+        )}
       </div>
 
       {/* Bottom HUD & Navigation */}
@@ -715,7 +734,7 @@ export function MapScreen() {
       {/* Leaderboard Modal / Screen */}
       {activeTab === 'leaderboard' && (
         <div className="absolute inset-0 z-[2000] bg-slate-100 dark:bg-[#050505] overflow-y-auto pb-32 pt-8 px-4">
-          <Leaderboard users={leaderboardUsers} onClose={() => setActiveTab('map')} />
+          <Leaderboard users={leaderboardUsers} userProfile={userProfile} onClose={() => setActiveTab('map')} />
         </div>
       )}
 

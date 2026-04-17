@@ -21,6 +21,8 @@ export function SocialScreen({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(true);
   const [updateError, setUpdateError] = useState<string | null>(null);
 
+  const [friendToRemove, setFriendToRemove] = useState<User | null>(null);
+
   useEffect(() => {
     if (!authUser || !userProfile) return;
 
@@ -270,11 +272,7 @@ export function SocialScreen({ onClose }: { onClose: () => void }) {
                     </div>
                   </div>
                   <button 
-                    onClick={() => {
-                      if (window.confirm(`Remove ${friend.displayName} from friends?`)) {
-                        authUser && removeFriend(authUser.uid, friend.uid);
-                      }
-                    }}
+                    onClick={() => setFriendToRemove(friend)}
                     className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-full transition-colors"
                   >
                     <UserX className="w-4 h-4" />
@@ -286,6 +284,37 @@ export function SocialScreen({ onClose }: { onClose: () => void }) {
         </div>
 
       </div>
+
+      {/* Remove Friend Confirmation Modal */}
+      {friendToRemove && (
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-xs glass-panel bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl border border-black/10 dark:border-white/10 scale-in duration-200">
+            <h3 className="text-lg font-display font-bold text-slate-900 dark:text-white mb-2">Remove Friend?</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+              Are you sure you want to remove <span className="font-bold text-slate-700 dark:text-slate-200">{friendToRemove.displayName}</span> from your friends list?
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setFriendToRemove(null)}
+                className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-xs uppercase tracking-widest hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  if (authUser && friendToRemove) {
+                    removeFriend(authUser.uid, friendToRemove.uid);
+                    setFriendToRemove(null);
+                  }
+                }}
+                className="flex-1 py-3 rounded-xl bg-red-500 text-white font-bold text-xs uppercase tracking-widest hover:bg-red-600 transition-colors shadow-lg shadow-red-500/20"
+              >
+                Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

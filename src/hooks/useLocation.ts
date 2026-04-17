@@ -135,14 +135,15 @@ export function useLocation(): LocationState {
 
   const simulateRun = useCallback(() => {
     setState(s => {
-      if (!s.currentLocation) return s;
+      // If the user's GPS is completely blocked or broken, give them a default start location
+      const startLocation = s.currentLocation || { lat: 37.7749, lng: -122.4194 };
       
       isSimulatingRef.current = true;
       isRunningRef.current = true;
       isPausedRef.current = false;
       
-      let currentLat = s.currentLocation.lat;
-      let currentLng = s.currentLocation.lng;
+      let currentLat = startLocation.lat;
+      let currentLng = startLocation.lng;
       let step = 0;
       
       if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
@@ -180,11 +181,13 @@ export function useLocation(): LocationState {
       
       return {
         ...s,
+        currentLocation: startLocation,
         isRunning: true,
         isPaused: false,
         startTime: Date.now(),
         elapsedTime: 0,
-        trail: [{ ...s.currentLocation, timestamp: Date.now() }]
+        trail: [{ ...startLocation, timestamp: Date.now() }],
+        error: null, // Clear any GPU/GPS errors since we're forcing simulation
       };
     });
   }, []);

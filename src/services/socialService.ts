@@ -1,5 +1,5 @@
 import { db } from '../lib/firebase';
-import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove, getDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, updateDoc, arrayUnion, arrayRemove, getDoc, writeBatch } from 'firebase/firestore';
 import { User } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/errors';
 
@@ -52,15 +52,19 @@ export const acceptFriendRequest = async (currentUserId: string, requesterId: st
     const currentUserRef = doc(db, 'users', currentUserId);
     const requesterRef = doc(db, 'users', requesterId);
 
+    const batch = writeBatch(db);
+    
     // Add to each other's friends list, remove from requests
-    await updateDoc(currentUserRef, {
+    batch.update(currentUserRef, {
       friends: arrayUnion(requesterId),
       friendRequests: arrayRemove(requesterId)
     });
 
-    await updateDoc(requesterRef, {
+    batch.update(requesterRef, {
       friends: arrayUnion(currentUserId)
     });
+    
+    await batch.commit();
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `users/${currentUserId}`);
   }
@@ -82,13 +86,17 @@ export const removeFriend = async (currentUserId: string, friendId: string) => {
     const currentUserRef = doc(db, 'users', currentUserId);
     const friendRef = doc(db, 'users', friendId);
 
-    await updateDoc(currentUserRef, {
+    const batch = writeBatch(db);
+
+    batch.update(currentUserRef, {
       friends: arrayRemove(friendId)
     });
 
-    await updateDoc(friendRef, {
+    batch.update(friendRef, {
       friends: arrayRemove(currentUserId)
     });
+    
+    await batch.commit();
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `users/${currentUserId}`);
   }

@@ -49,24 +49,35 @@ body {
 
 @layer utilities {
   .glass-card-base {
-    background: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.95);
     border: 1px solid rgba(255, 255, 255, 0.8);
     border-radius: 20px;
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
     box-shadow:
       0 8px 32px rgba(0, 0, 0, 0.1),
       0 1px 0 rgba(255, 255, 255, 0.8) inset,
       0 -1px 0 rgba(0, 0, 0, 0.05) inset;
   }
+  @supports (-webkit-backdrop-filter: blur(24px)) or (backdrop-filter: blur(24px)) {
+    .glass-card-base {
+      background: rgba(255, 255, 255, 0.7);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      backdrop-filter: blur(24px) saturate(180%);
+      transform: translateZ(0);
+    }
+  }
 
   .dark .glass-card-base {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(13, 17, 23, 0.90);
     border: 1px solid rgba(255, 255, 255, 0.10);
     box-shadow:
       0 8px 32px rgba(0, 0, 0, 0.4),
       0 1px 0 rgba(255, 255, 255, 0.08) inset,
       0 -1px 0 rgba(0, 0, 0, 0.3) inset;
+  }
+  @supports (-webkit-backdrop-filter: blur(24px)) or (backdrop-filter: blur(24px)) {
+    .dark .glass-card-base {
+      background: rgba(13, 17, 23, 0.65);
+    }
   }
 
   .glass-card-elevated {
@@ -127,54 +138,76 @@ body {
   }
 
   .glass-panel {
-    background: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.95);
     border: 1px solid rgba(255, 255, 255, 0.8);
     border-radius: 20px;
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
     box-shadow:
       0 8px 32px rgba(0, 0, 0, 0.1),
       0 1px 0 rgba(255, 255, 255, 0.8) inset,
       0 -1px 0 rgba(0, 0, 0, 0.05) inset;
   }
+  @supports (-webkit-backdrop-filter: blur(24px)) or (backdrop-filter: blur(24px)) {
+    .glass-panel {
+      background: rgba(255, 255, 255, 0.7);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      backdrop-filter: blur(24px) saturate(180%);
+      transform: translateZ(0);
+    }
+  }
 
   .dark .glass-panel {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(13, 17, 23, 0.90);
     border: 1px solid rgba(255, 255, 255, 0.10);
     box-shadow:
       0 8px 32px rgba(0, 0, 0, 0.4),
       0 1px 0 rgba(255, 255, 255, 0.08) inset,
       0 -1px 0 rgba(0, 0, 0, 0.3) inset;
   }
+  @supports (-webkit-backdrop-filter: blur(24px)) or (backdrop-filter: blur(24px)) {
+    .dark .glass-panel {
+      background: rgba(13, 17, 23, 0.55);
+    }
+  }
 
   .glass-button {
-    background: rgba(255, 255, 255, 0.6);
+    background: rgba(255, 255, 255, 0.95);
     border: 1px solid rgba(255, 255, 255, 0.8);
     border-radius: 20px;
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
     box-shadow:
       0 8px 32px rgba(0, 0, 0, 0.1),
       0 1px 0 rgba(255, 255, 255, 0.8) inset,
       0 -1px 0 rgba(0, 0, 0, 0.05) inset;
     transition: all 300ms;
   }
+  @supports (-webkit-backdrop-filter: blur(24px)) or (backdrop-filter: blur(24px)) {
+    .glass-button {
+      background: rgba(255, 255, 255, 0.7);
+      -webkit-backdrop-filter: blur(24px) saturate(180%);
+      backdrop-filter: blur(24px) saturate(180%);
+      transform: translateZ(0);
+    }
+  }
 
   .glass-button:hover {
-    background: rgba(255, 255, 255, 0.8);
+    background: rgba(255, 255, 255, 0.9);
   }
 
   .dark .glass-button {
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(13, 17, 23, 0.90);
     border: 1px solid rgba(255, 255, 255, 0.10);
     box-shadow:
       0 8px 32px rgba(0, 0, 0, 0.4),
       0 1px 0 rgba(255, 255, 255, 0.08) inset,
       0 -1px 0 rgba(0, 0, 0, 0.3) inset;
   }
+  @supports (-webkit-backdrop-filter: blur(24px)) or (backdrop-filter: blur(24px)) {
+    .dark .glass-button {
+      background: rgba(13, 17, 23, 0.65);
+    }
+  }
 
   .dark .glass-button:hover {
-    background: rgba(255, 255, 255, 0.12);
+    background: rgba(30, 41, 59, 0.8);
   }
   .text-glow {
     text-shadow: 0 0 20px currentColor;

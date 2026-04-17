@@ -1,28 +1,38 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { User } from '../types';
-import { Trophy, X } from 'lucide-react';
+import { Trophy, X, Users, Globe } from 'lucide-react';
 import { LeaderboardItem } from './ui/LeaderboardItem';
 import { NeonText } from './ui/NeonText';
 import { auth } from '../lib/firebase';
 
 interface LeaderboardProps {
   users: User[];
+  userProfile: User | null;
   onClose: () => void;
 }
 
-export function Leaderboard({ users, onClose }: LeaderboardProps) {
+export function Leaderboard({ users, userProfile, onClose }: LeaderboardProps) {
   const currentUserId = auth.currentUser?.uid;
+  const [filter, setFilter] = useState<'global' | 'friends'>('global');
+
+  const filteredUsers = useMemo(() => {
+    if (filter === 'global') return users;
+    
+    const friendIds = userProfile?.friends || [];
+    // Include self and friends
+    return users.filter(user => user.uid === currentUserId || friendIds.includes(user.uid));
+  }, [users, filter, userProfile, currentUserId]);
 
   return (
     <div className="w-full max-w-md mx-auto flex flex-col h-full animate-in fade-in duration-500">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8 relative z-10">
+      <div className="flex items-center justify-between mb-6 relative z-10">
         <div className="flex items-center gap-3">
           <div className="bg-teal-500/10 p-2.5 rounded-2xl border border-teal-500/20 shadow-[0_0_15px_rgba(20,184,166,0.15)]">
             <Trophy className="h-5 w-5 text-teal-600 dark:text-teal-400" />
           </div>
           <NeonText className="text-2xl font-display font-bold tracking-tight text-teal-600 dark:text-teal-400" color="currentColor">
-            Global Ranking
+            {filter === 'global' ? 'Global Ranking' : 'Friend Ranking'}
           </NeonText>
         </div>
         <button
@@ -33,9 +43,35 @@ export function Leaderboard({ users, onClose }: LeaderboardProps) {
         </button>
       </div>
 
+      {/* Filter Toggle */}
+      <div className="flex bg-slate-200 dark:bg-white/5 rounded-2xl p-1.5 mb-8 relative z-10 border border-black/5 dark:border-white/5">
+        <button
+          onClick={() => setFilter('global')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all duration-300 ${
+            filter === 'global' 
+              ? 'bg-white dark:bg-white/10 text-teal-600 dark:text-teal-400 shadow-lg shadow-black/5' 
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+          }`}
+        >
+          <Globe className="w-3.5 h-3.5" />
+          Global
+        </button>
+        <button
+          onClick={() => setFilter('friends')}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-bold uppercase tracking-widest transition-all duration-300 ${
+            filter === 'friends' 
+              ? 'bg-white dark:bg-white/10 text-teal-600 dark:text-teal-400 shadow-lg shadow-black/5' 
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
+          }`}
+        >
+          <Users className="w-3.5 h-3.5" />
+          Friends
+        </button>
+      </div>
+
       {/* List */}
       <div className="flex-1 space-y-3 relative z-10">
-        {users.map((user, index) => (
+        {filteredUsers.map((user, index) => (
           <LeaderboardItem
             key={user.uid}
             rank={index + 1}
@@ -47,9 +83,9 @@ export function Leaderboard({ users, onClose }: LeaderboardProps) {
           />
         ))}
 
-        {users.length === 0 && (
+        {filteredUsers.length === 0 && (
           <div className="text-center p-8 text-slate-600 font-medium tracking-wide">
-            <p>No runners yet. Be the first!</p>
+            <p>No runners found in this category.</p>
           </div>
         )}
       </div>

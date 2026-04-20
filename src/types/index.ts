@@ -4,7 +4,7 @@ export interface User {
   territoryColor: string;
   totalDistance: number;
   territoryStrength: number;
-  lastActive: any; // Firestore Timestamp
+  lastActive: Date | { toDate: () => Date } | number | string | null | undefined; // Firestore Timestamp
   wins: number;
   losses: number;
   photoURL?: string | null;
@@ -29,14 +29,15 @@ export interface Territory {
   uid: string;
   coordinates: Coordinate[];
   strength: number;
-  lastUpdated: any; // Firestore Timestamp
+  lastUpdated: Date | { toDate: () => Date } | number | string | null | undefined; // Firestore Timestamp
   areaKm2: number;
+  user?: User;
 }
 
 export interface Session {
   uid: string;
-  startTime: any; // Firestore Timestamp
-  endTime: any; // Firestore Timestamp
+  startTime: Date | { toDate: () => Date } | number | string | null | undefined; // Firestore Timestamp
+  endTime: Date | { toDate: () => Date } | number | string | null | undefined; // Firestore Timestamp
   distanceCovered: number;
   coordinatesTrail: (Coordinate & { timestamp: number })[];
   territoryGained: number;

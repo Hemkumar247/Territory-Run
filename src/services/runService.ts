@@ -3,13 +3,25 @@ import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, arrayUn
 import { Coordinate, Session, Territory, User } from '../types';
 import { checkAchievements } from '../lib/achievements';
 
+/**
+ * Persists a completed run session to the Firestore database.
+ * Computes polygon state updates and unlocks relevant achievements asynchronously.
+ * 
+ * @param userProfile - The active user's profile object
+ * @param trail - List of coordinates collected during the run
+ * @param distanceCovered - Total run path in meters
+ * @param territoryPolygon - Bounding coordinate array formatting a turf polygon 
+ * @param territoryArea - Area enclosed by the polygon in square meters
+ * @returns Array of new achievement string IDs unlocked by the run 
+ * @throws FirestoreError on failing transaction states
+ */
 export async function saveRunSession(
   userProfile: User,
   trail: (Coordinate & { timestamp: number })[],
   distanceCovered: number,
   territoryPolygon: [number, number][] | null, // [lng, lat] format from Turf
   territoryArea: number
-) {
+): Promise<string[] | undefined> {
   if (trail.length === 0) return;
 
   const uid = userProfile.uid;
@@ -40,7 +52,7 @@ export async function saveRunSession(
       uid,
       coordinates,
       strength: 100, // Initial strength
-      lastUpdated: serverTimestamp(),
+      lastUpdated: serverTimestamp() as any,
       areaKm2: territoryArea / 1000000, // Convert m2 to km2
     };
 
@@ -57,7 +69,7 @@ export async function saveRunSession(
 
   // 4. Update the User Profile
   const userRef = doc(db, 'users', uid);
-  const userUpdates: any = {
+  const userUpdates: Record<string, unknown> = {
     totalDistance: increment(distanceCovered),
     totalRuns: increment(1),
     lastActive: serverTimestamp(),

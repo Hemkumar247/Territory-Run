@@ -1,17 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, useMap, ZoomControl, GeoJSON } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import { useLocation } from '../hooks/useLocation';
 import { useFirebase } from './FirebaseProvider';
 import { useGlobalData } from '../hooks/useGlobalData';
-import { LogOut, Navigation, AlertTriangle, Play, CheckCircle2, Loader2, Trophy, Moon, Sun, Square, X, LocateFixed, BrainCircuit } from 'lucide-react';
+import { LogOut, Navigation, AlertTriangle, Loader2, Moon, Sun, Play, X, CheckCircle2 } from 'lucide-react';
 import { logout } from '../services/authService';
 import { saveRunSession } from '../services/runService';
 import { Leaderboard } from './Leaderboard';
 import { WelcomeModal } from './WelcomeModal';
 import * as turf from '@turf/turf';
 import { calculateDecayedStrength, getStrengthLevel, escapeHtml } from '../lib/utils';
-import { getTacticalAdvice } from '../services/aiTactician';
 
 import { NavigationTabBar } from './ui/NavigationTabBar';
 import { BottomHUD } from './ui/BottomHUD';
@@ -90,7 +89,7 @@ function getTerritoryBadgeSVG(user: User | undefined): string {
 
 export function MapScreen() {
   const { userProfile, authUser } = useFirebase();
-  const { currentLocation, trail, error, isTracking, isRunning, isPaused, elapsedTime, totalDistanceCovered, startRun, pauseRun, resumeRun, endRun, resetRun, simulateRun } = useLocation();
+  const { currentLocation, trail, error, isTracking, isRunning, isPaused, elapsedTime, startRun, pauseRun, resumeRun, endRun, resetRun, simulateRun } = useLocation();
   const { territories, leaderboardUsers, loading } = useGlobalData();
   
   // Calculate user's total territory stats
@@ -123,8 +122,6 @@ export function MapScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [summaryData, setSummaryData] = useState({ distance: 0, area: 0 });
   const [showRivalAlert, setShowRivalAlert] = useState(false);
-  const [aiTactics, setAiTactics] = useState<string | null>(null);
-  const [isAiTacticsLoading, setIsAiTacticsLoading] = useState(false);
 
   const handleCloseWelcome = () => {
     sessionStorage.setItem('welcomeShown', 'true');
@@ -313,7 +310,7 @@ export function MapScreen() {
           }
         }
       });
-    } catch (e) {
+    } catch (_e) {
       // Ignore turf errors from invalid polygons
     }
   }, [territoryPolygon, visibleTerritories, isRunning, authUser, userProfile]);
@@ -366,6 +363,16 @@ export function MapScreen() {
     }
   };
 
+  if (isSaving) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center bg-slate-100/80 dark:bg-[#050505]/80 backdrop-blur-md z-[2000] fixed inset-0">
+        <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mb-4" />
+        <h2 className="text-xl font-bold font-display text-slate-900 dark:text-white">Conquering territory...</h2>
+        <p className="text-slate-500 dark:text-slate-400">Saving your run data</p>
+      </div>
+    );
+  }
+
   if (showSummary) {
     return (
       <div className="flex h-screen flex-col items-center justify-center bg-slate-100/80 dark:bg-[#050505]/80 backdrop-blur-md p-4 relative overflow-hidden animate-in fade-in duration-500 z-[2000]">
@@ -417,10 +424,10 @@ export function MapScreen() {
   }
 
   return (
-    <div className="relative h-screen w-full bg-slate-100 dark:bg-[#050505] flex flex-col overflow-hidden">
+    <main aria-label="Game Screen" className="relative h-screen w-full bg-slate-100 dark:bg-[#050505] flex flex-col overflow-hidden">
       {/* Top Navigation Bar */}
-      <div className="absolute top-0 left-0 right-0 z-[1000] flex items-center justify-between p-6 pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-3 glass-panel bg-white/90 dark:bg-black/40 px-5 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10">
+      <header aria-label="Status Bar" className="absolute top-0 left-0 right-0 z-[1000] flex items-center justify-between p-6 pointer-events-none">
+        <div role="status" aria-live="polite" className="pointer-events-auto flex items-center gap-3 glass-panel bg-white/90 dark:bg-black/40 px-5 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10">
           <div className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
@@ -434,20 +441,20 @@ export function MapScreen() {
         {!isRunning && !isPaused && (
           <button
             onClick={simulateRun}
-            aria-label="Simulate Run"
+            aria-label="Simulate GPS Run"
             className="pointer-events-auto flex items-center gap-2 glass-panel bg-white/90 dark:bg-black/40 px-4 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10 hover:bg-white dark:hover:bg-black/60 transition-colors"
           >
-            <Play className="h-3.5 w-3.5 text-slate-700 dark:text-slate-200" />
+            <Navigation aria-hidden="true" className="h-3.5 w-3.5 text-slate-700 dark:text-slate-200" />
             <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 tracking-[0.2em] uppercase">
               Simulate
             </span>
           </button>
         )}
-      </div>
+      </header>
 
       {/* Error Banner */}
       {error && (
-        <div className="absolute top-28 left-1/2 -translate-x-1/2 z-[1000] glass-panel bg-slate-100/80 dark:bg-[#050505]/80 border-red-500/20 px-6 py-5 rounded-[2rem] flex items-center gap-5 w-[90%] max-w-md shadow-[0_20px_40px_rgba(239,68,68,0.15)] backdrop-blur-xl">
+        <section role="alert" aria-live="assertive" className="absolute top-28 left-1/2 -translate-x-1/2 z-[1000] glass-panel bg-slate-100/80 dark:bg-[#050505]/80 border-red-500/20 px-6 py-5 rounded-[2rem] flex items-center gap-5 w-[90%] max-w-md shadow-[0_20px_40px_rgba(239,68,68,0.15)] backdrop-blur-xl">
           <div className="bg-red-500/10 p-3 rounded-2xl border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
             <AlertTriangle className="h-6 w-6 text-red-500 dark:text-red-400" />
           </div>
@@ -455,19 +462,19 @@ export function MapScreen() {
             <h3 className="text-sm font-display font-bold text-red-600 dark:text-red-100 tracking-wide">GPS Signal Lost</h3>
             <p className="text-xs text-red-500/80 dark:text-red-200/60 mt-1 font-medium tracking-wide">Please ensure location services are enabled.</p>
           </div>
-        </div>
+        </section>
       )}
 
       {/* Loading Indicator for Territories */}
       {loading && currentLocation && (
-        <div className="absolute top-28 left-1/2 -translate-x-1/2 z-[1000] glass-panel bg-white/90 dark:bg-black/40 px-6 py-3 rounded-full flex items-center gap-4 shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10">
+        <div role="status" aria-busy="true" className="absolute top-28 left-1/2 -translate-x-1/2 z-[1000] glass-panel bg-white/90 dark:bg-black/40 px-6 py-3 rounded-full flex items-center gap-4 shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10">
           <Loader2 className="h-5 w-5 animate-spin text-teal-500 dark:text-teal-400" />
           <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-[0.2em]">Syncing Map...</span>
         </div>
       )}
 
       {/* Map Container */}
-      <div className="flex-1 w-full relative z-0">
+      <section aria-label="Interactive Map Area" className="flex-1 w-full relative z-0">
         {!currentLocation ? (
           <div className="h-full w-full flex flex-col items-center justify-center bg-slate-100 dark:bg-[#050505] text-slate-600 dark:text-slate-400 relative overflow-hidden">
             <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-[120px] mix-blend-screen pointer-events-none ${error ? 'bg-red-500/10' : 'bg-emerald-500/10'}`} />
@@ -535,7 +542,7 @@ export function MapScreen() {
                   const polygon = turf.polygon([turfCoords]);
                   const center = turf.centroid(polygon);
                   centroid = [center.geometry.coordinates[1], center.geometry.coordinates[0]];
-                } catch (e) {
+                } catch (_e) {
                   centroid = polyCoords[0];
                 }
               } else if (polyCoords.length > 0) {
@@ -700,7 +707,7 @@ export function MapScreen() {
             )}
           </MapContainer>
         )}
-      </div>
+      </section>
 
       {/* Bottom HUD & Navigation */}
       {activeTab === 'map' && (
@@ -837,6 +844,6 @@ export function MapScreen() {
       {showWelcome && userProfile && (
         <WelcomeModal user={userProfile} onClose={handleCloseWelcome} />
       )}
-    </div>
+    </main>
   );
 }

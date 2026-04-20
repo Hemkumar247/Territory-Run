@@ -1,6 +1,6 @@
-import { collection, doc, onSnapshot, query, setDoc, updateDoc, where, serverTimestamp, orderBy, limit } from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, setDoc, updateDoc, where, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { User } from '../types';
+// unused import User
 import { handleFirestoreError, OperationType } from '../lib/errors';
 
 export interface AppNotification {

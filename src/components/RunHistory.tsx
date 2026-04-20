@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useFirebase } from './FirebaseProvider';
 import { Session } from '../types';
@@ -29,8 +29,15 @@ export function RunHistory() {
         
         // Sort locally to avoid needing a composite index
         fetchedSessions.sort((a, b) => {
-          const timeA = a.startTime?.toMillis ? a.startTime.toMillis() : (a.startTime as any)?.seconds * 1000 || 0;
-          const timeB = b.startTime?.toMillis ? b.startTime.toMillis() : (b.startTime as any)?.seconds * 1000 || 0;
+          const checkMillis = (dateObj: any): number => {
+            if (!dateObj) return 0;
+            if (typeof dateObj.toMillis === 'function') return dateObj.toMillis();
+            if (dateObj.seconds) return dateObj.seconds * 1000;
+            return new Date(dateObj).getTime() || 0;
+          };
+          
+          const timeA = checkMillis(a.startTime);
+          const timeB = checkMillis(b.startTime);
           return timeB - timeA;
         });
         
@@ -76,8 +83,14 @@ export function RunHistory() {
 
       <div className="w-full max-w-md space-y-6">
         {sessions.map((session, index) => {
-          const startTime = session.startTime?.toDate ? session.startTime.toDate() : new Date(session.startTime);
-          const endTime = session.endTime?.toDate ? session.endTime.toDate() : new Date(session.endTime);
+            const getValidDate = (dateObj: any): Date => {
+                if (typeof dateObj === 'object' && dateObj !== null && typeof dateObj.toDate === 'function') {
+                    return dateObj.toDate();
+                }
+                return new Date(dateObj as any);
+            };
+          const startTime = getValidDate(session.startTime);
+          const endTime = getValidDate(session.endTime);
           const durationSeconds = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
           const distanceKm = session.distanceCovered / 1000;
           

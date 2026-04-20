@@ -36,10 +36,10 @@ export const LeaderboardItem = React.forwardRef<HTMLDivElement, LeaderboardItemP
 
         <div className="relative w-12 h-12 rounded-full overflow-hidden border-2" style={{ borderColor: isCurrentUser ? color : 'rgba(128,128,128,0.2)' }}>
           {avatarUrl ? (
-            <img src={avatarUrl} alt={name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            <img src={avatarUrl} alt={`${name}'s avatar profile picture`} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
           ) : (
             <div className="w-full h-full bg-black/5 dark:bg-white/10 flex items-center justify-center">
-              <span className="text-slate-500 dark:text-white/50 font-bold">{name.charAt(0).toUpperCase()}</span>
+              <span aria-hidden="true" className="text-slate-500 dark:text-white/50 font-bold">{name.charAt(0).toUpperCase()}</span>
             </div>
           )}
         </div>

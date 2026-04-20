@@ -25,6 +25,7 @@ export const GlassCard = React.forwardRef<HTMLDivElement, GlassCardProps>(
     return (
       <div
         ref={ref}
+        role="article"
         className={cn(
           variantClasses[variant],
           className

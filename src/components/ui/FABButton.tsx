@@ -9,7 +9,7 @@ export interface FABButtonProps extends HTMLMotionProps<"button"> {
 }
 
 export const FABButton = React.forwardRef<HTMLButtonElement, FABButtonProps>(
-  ({ className, icon, label, variant = 'primary', children, ...props }, ref) => {
+  ({ className, icon, label, variant: _variant = 'primary', children, ...props }, ref) => {
     
     return (
       <motion.button

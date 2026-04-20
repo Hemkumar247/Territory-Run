@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { NavigationTabBar } from './NavigationTabBar';
 import { describe, it, expect, vitest } from 'vitest';
 

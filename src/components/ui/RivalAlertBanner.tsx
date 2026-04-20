@@ -2,7 +2,6 @@ import React from 'react';
 import { cn } from '../../lib/utils';
 import { motion, HTMLMotionProps } from 'motion/react';
 import { GlassCard } from './GlassCard';
-import { NeonText } from './NeonText';
 import { AlertCircle } from 'lucide-react';
 
 export interface RivalAlertBannerProps extends HTMLMotionProps<"div"> {

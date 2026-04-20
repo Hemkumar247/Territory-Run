@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 import { getUserRank } from '../lib/ranks';
-import { Map, Trophy, Play, Flag } from 'lucide-react';
+import { Map, Trophy, Flag } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 interface WelcomeModalProps {

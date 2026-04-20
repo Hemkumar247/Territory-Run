@@ -1,8 +1,6 @@
 import { auth, db, googleProvider } from '../lib/firebase';
 import { 
   signInWithPopup, 
-  createUserWithEmailAndPassword, 
-  signInWithEmailAndPassword, 
   signOut, 
   User as FirebaseUser 
 } from 'firebase/auth';

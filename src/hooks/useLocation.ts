@@ -68,6 +68,12 @@ export function useLocation(): LocationState {
         const newCoord = { lat: latitude, lng: longitude };
         
         setState((prev) => {
+          // Compare with last point to prevent identical stacking but allow micro-movements
+          const lastPoint = prev.trail[prev.trail.length - 1];
+          if (isRunningRef.current && !isPausedRef.current && lastPoint && lastPoint.lat === latitude && lastPoint.lng === longitude) {
+            return { ...prev, currentLocation: newCoord, error: null };
+          }
+          
           const newTrailPoint = { ...newCoord, timestamp: Date.now() };
           return {
             ...prev,
@@ -96,13 +102,44 @@ export function useLocation(): LocationState {
       },
       {
         enableHighAccuracy: true,
-        timeout: 10000,
+        timeout: 5000,
         maximumAge: 0,
       }
     );
 
+    // Supplementary poller for testing indoors or when moving slowly around a room
+    // WatchPosition sometimes stalls if the OS filters it, this forces hardware checks
+    let indoorPoller: NodeJS.Timeout | null = null;
+    indoorPoller = setInterval(() => {
+      if (!isSimulatingRef.current && isRunningRef.current && !isPausedRef.current) {
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const { latitude, longitude } = position.coords;
+            const newCoord = { lat: latitude, lng: longitude };
+            
+            setState((prev) => {
+              const lastPoint = prev.trail[prev.trail.length - 1];
+              if (lastPoint && lastPoint.lat === latitude && lastPoint.lng === longitude) {
+                return prev; // Ignore identical to prevent thrashing
+              }
+              const newTrailPoint = { ...newCoord, timestamp: Date.now() };
+              return {
+                ...prev,
+                currentLocation: newCoord,
+                trail: [...prev.trail, newTrailPoint],
+                error: null,
+              };
+            });
+          },
+          () => {}, // Ignore errors for background polls
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 3000 }
+        );
+      }
+    }, 2000);
+
     return () => {
       navigator.geolocation.clearWatch(watchId);
+      if (indoorPoller) clearInterval(indoorPoller);
       if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
     };
   }, []);

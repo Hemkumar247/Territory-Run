@@ -22,12 +22,13 @@ export const NavigationTabBar = React.forwardRef<HTMLDivElement, NavigationTabBa
     ] as const;
 
     return (
-      <div
+      <nav
+        aria-label="Bottom Navigation"
         ref={ref}
         className={cn('fixed bottom-0 left-0 right-0 p-4 pb-8 z-[3000] pointer-events-none', className)}
         {...props}
       >
-        <GlassCard variant="base" className="max-w-md mx-auto rounded-[24px] pointer-events-auto flex justify-around items-center p-2">
+        <GlassCard role="tablist" variant="base" className="max-w-md mx-auto rounded-[24px] pointer-events-auto flex justify-around items-center p-2">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.id;
             const Icon = tab.icon;
@@ -35,6 +36,9 @@ export const NavigationTabBar = React.forwardRef<HTMLDivElement, NavigationTabBa
             return (
               <button
                 key={tab.id}
+                role="tab"
+                aria-selected={isActive}
+                aria-label={`Go to ${tab.label}`}
                 onClick={() => onTabChange(tab.id)}
                 className={cn(
                   "relative flex flex-col items-center justify-center w-16 h-14 rounded-[16px] transition-colors duration-300",
@@ -70,7 +74,7 @@ export const NavigationTabBar = React.forwardRef<HTMLDivElement, NavigationTabBa
             );
           })}
         </GlassCard>
-      </div>
+      </nav>
     );
   }
 );

@@ -20,7 +20,8 @@ export interface BottomHUDProps extends React.HTMLAttributes<HTMLDivElement> {
 export const BottomHUD = React.forwardRef<HTMLDivElement, BottomHUDProps>(
   ({ className, isRunning, isPaused, distance, pace, time, onStart, onPause, onResume, onStop, ...props }, ref) => {
     return (
-      <div
+      <section
+        aria-label="Live Run Tracking Dashboard"
         ref={ref}
         className={cn('fixed bottom-0 left-0 right-0 p-4 pb-8 z-50', className)}
         {...props}
@@ -36,7 +37,7 @@ export const BottomHUD = React.forwardRef<HTMLDivElement, BottomHUDProps>(
 
           <div className="flex justify-center items-center gap-4">
             {!isRunning && !isPaused && (
-              <FABButton className="w-full py-4 text-lg" onClick={onStart}>
+              <FABButton aria-label="Start Run" className="w-full py-4 text-lg" onClick={onStart}>
                 <Play size={24} className="mr-2" /> Start Run
               </FABButton>
             )}
@@ -44,23 +45,25 @@ export const BottomHUD = React.forwardRef<HTMLDivElement, BottomHUDProps>(
             {(isRunning || isPaused) && (
               <>
                 <FABButton
+                  aria-label={isPaused ? "Resume Run" : "Pause Run"}
                   className="w-16 h-16 rounded-full p-0 flex items-center justify-center bg-slate-200/50 dark:bg-white/10 border border-slate-300 dark:border-white/20"
                   onClick={isPaused ? onResume : onPause}
                 >
-                  {isPaused ? <Play size={24} className="text-[#008B99] dark:text-[#00E5FF]" /> : <Pause size={24} className="text-[#B38000] dark:text-[#FFB800]" />}
+                  {isPaused ? <Play aria-hidden="true" size={24} className="text-[#008B99] dark:text-[#00E5FF]" /> : <Pause aria-hidden="true" size={24} className="text-[#B38000] dark:text-[#FFB800]" />}
                 </FABButton>
                 
                 <FABButton
+                  aria-label="Stop Run"
                   className="w-16 h-16 rounded-full p-0 flex items-center justify-center bg-[#B32A78]/10 dark:bg-[#FF3CAC]/15 border border-[#B32A78]/30 dark:border-[#FF3CAC]/30"
                   onClick={onStop}
                 >
-                  <Square size={24} className="text-[#B32A78] dark:text-[#FF3CAC]" />
+                  <Square aria-hidden="true" size={24} className="text-[#B32A78] dark:text-[#FF3CAC]" />
                 </FABButton>
               </>
             )}
           </div>
         </GlassCard>
-      </div>
+      </section>
     );
   }
 );

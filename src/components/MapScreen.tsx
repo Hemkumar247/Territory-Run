@@ -4,13 +4,14 @@ import L from 'leaflet';
 import { useLocation } from '../hooks/useLocation';
 import { useFirebase } from './FirebaseProvider';
 import { useGlobalData } from '../hooks/useGlobalData';
-import { LogOut, Navigation, AlertTriangle, Play, CheckCircle2, Loader2, Trophy, Moon, Sun, Square, X, LocateFixed } from 'lucide-react';
+import { LogOut, Navigation, AlertTriangle, Play, CheckCircle2, Loader2, Trophy, Moon, Sun, Square, X, LocateFixed, BrainCircuit } from 'lucide-react';
 import { logout } from '../services/authService';
 import { saveRunSession } from '../services/runService';
 import { Leaderboard } from './Leaderboard';
 import { WelcomeModal } from './WelcomeModal';
 import * as turf from '@turf/turf';
 import { calculateDecayedStrength, getStrengthLevel, escapeHtml } from '../lib/utils';
+import { getTacticalAdvice } from '../services/aiTactician';
 
 import { NavigationTabBar } from './ui/NavigationTabBar';
 import { BottomHUD } from './ui/BottomHUD';
@@ -122,6 +123,8 @@ export function MapScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [summaryData, setSummaryData] = useState({ distance: 0, area: 0 });
   const [showRivalAlert, setShowRivalAlert] = useState(false);
+  const [aiTactics, setAiTactics] = useState<string | null>(null);
+  const [isAiTacticsLoading, setIsAiTacticsLoading] = useState(false);
 
   const handleCloseWelcome = () => {
     sessionStorage.setItem('welcomeShown', 'true');
@@ -431,6 +434,7 @@ export function MapScreen() {
         {!isRunning && !isPaused && (
           <button
             onClick={simulateRun}
+            aria-label="Simulate Run"
             className="pointer-events-auto flex items-center gap-2 glass-panel bg-white/90 dark:bg-black/40 px-4 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10 hover:bg-white dark:hover:bg-black/60 transition-colors"
           >
             <Play className="h-3.5 w-3.5 text-slate-700 dark:text-slate-200" />
@@ -488,6 +492,7 @@ export function MapScreen() {
               {error && (
                 <button
                   onClick={simulateRun}
+                  aria-label="Force Simulation due to GPS Error"
                   className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-full font-bold uppercase tracking-widest text-xs hover:scale-105 transition-transform shadow-xl flex items-center gap-2"
                 >
                   <Play className="w-4 h-4 fill-current" /> Try Simulation

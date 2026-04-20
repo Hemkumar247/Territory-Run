@@ -87,25 +87,54 @@ export function escapeHtml(unsafe: string): string {
  */
 export class TerritorySpatialHash {
   private grid: Map<string, any[]>;
-  private readonly CACHE_SIZE = 100;
+  private resolutionMultiplier: number;
 
-  constructor() {
+  constructor(resolutionKm: number = 1.0) {
     this.grid = new Map();
+    // roughly 111km per degree.
+    // So for 1km resolution, we multiply by 111
+    this.resolutionMultiplier = 111 / resolutionKm;
   }
 
-  /**
-   * Generates a spatial hash key for O(1) lookup matrices
-   * 
-   * @param lat - Latitude float
-   * @param lng - Longitude float
-   * @returns String hash index 
-   * @throws ValueError if coordinates are invalid bounds
-   */
   public getHashKey(lat: number, lng: number): string {
     if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
       throw new Error("ValueError: Out of bounds GPS coordinate");
     }
-    // Snap to ~100m grid chunks
-    return `${Math.floor(lat * 100)}_${Math.floor(lng * 100)}`;
+    return `${Math.floor(lat * this.resolutionMultiplier)}_${Math.floor(lng * this.resolutionMultiplier)}`;
+  }
+
+  public insert(territory: any): void {
+    if (!territory.coordinates || territory.coordinates.length === 0) return;
+    // Just use the first coordinate (or centroid) to map it to a grid cell
+    const center = territory.coordinates[0];
+    try {
+      const key = this.getHashKey(center.lat, center.lng);
+      if (!this.grid.has(key)) {
+        this.grid.set(key, []);
+      }
+      this.grid.get(key)!.push(territory);
+    } catch (e) {
+      // ignore OOB territories
+    }
+  }
+
+  public queryRadius(lat: number, lng: number, radiusKm: number): any[] {
+    const results = new Map();
+    const cellRadius = Math.ceil(radiusKm / (111 / this.resolutionMultiplier)) + 1; // Check adjacent cells
+    
+    const centerLatIndex = Math.floor(lat * this.resolutionMultiplier);
+    const centerLngIndex = Math.floor(lng * this.resolutionMultiplier);
+
+    // O(1) contiguous lookup based on bounding cells (constant tight loop e.g. 3x3 or 5x5)
+    for (let i = -cellRadius; i <= cellRadius; i++) {
+        for (let j = -cellRadius; j <= cellRadius; j++) {
+            const key = `${centerLatIndex + i}_${centerLngIndex + j}`;
+            const cell = this.grid.get(key);
+            if (cell) {
+                cell.forEach(t => results.set(t.uid, t));
+            }
+        }
+    }
+    return Array.from(results.values());
   }
 }

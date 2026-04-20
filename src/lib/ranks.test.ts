@@ -21,6 +21,27 @@ describe('Ranks Calculation Logic', () => {
     expect(rank.nextAt).toBe(20);
   });
 
+  it('assigns Pathfinder accurately (Level 3)', () => {
+    const rank = getUserRank(20000);
+    expect(rank.level).toBe(3);
+    expect(rank.title).toBe('Pathfinder');
+    expect(rank.nextAt).toBe(50);
+  });
+
+  it('assigns Conqueror accurately (Level 4)', () => {
+    const rank = getUserRank(50000);
+    expect(rank.level).toBe(4);
+    expect(rank.title).toBe('Conqueror');
+    expect(rank.nextAt).toBe(100);
+  });
+
+  it('assigns Grandmaster accurately (Level 5)', () => {
+    const rank = getUserRank(100000);
+    expect(rank.level).toBe(5);
+    expect(rank.title).toBe('Grandmaster');
+    expect(rank.nextAt).toBe(500);
+  });
+
   it('assigns Legend accurately (Level 6)', () => {
     // > 500 km
     const rank = getUserRank(500000);

@@ -10,7 +10,7 @@ import { saveRunSession } from '../services/runService';
 import { Leaderboard } from './Leaderboard';
 import { WelcomeModal } from './WelcomeModal';
 import * as turf from '@turf/turf';
-import { calculateDecayedStrength, getStrengthLevel, escapeHtml } from '../lib/utils';
+import { calculateDecayedStrength, getStrengthLevel, escapeHtml, TerritorySpatialHash } from '../lib/utils';
 
 import { NavigationTabBar } from './ui/NavigationTabBar';
 import { BottomHUD } from './ui/BottomHUD';
@@ -168,22 +168,45 @@ export function MapScreen() {
   // Convert trail to Leaflet LatLng format
   const polylinePositions = trail.map(point => [point.lat, point.lng] as [number, number]);
 
-  // Filter territories within 5km radius, always include user's own territory
+  // Create an O(1) Spatial Hash for active territories
+  const spatialHash = useMemo(() => {
+    const hash = new TerritorySpatialHash(1.0); // 1km cell size
+    territories.forEach(t => hash.insert(t));
+    return hash;
+  }, [territories]);
+
+  // Filter territories within roughly 5km radius using Spatial Hash (O(1) approach)
   const visibleTerritories = useMemo(() => {
     if (!currentLocation || loading) return [];
-    const userPt = turf.point([currentLocation.lng, currentLocation.lat]);
+    
+    // Use spatial hash to retrieve candidates instead of iterating globally
+    const candidateTerritories = spatialHash.queryRadius(
+      currentLocation.lat, 
+      currentLocation.lng, 
+      5.0 // 5km search radius
+    );
 
-    return territories.filter(t => {
-      if (!t.coordinates || t.coordinates.length === 0) return false;
-      // Always show current user's territory
-      if (t.uid === authUser?.uid) return true;
-      
-      // Check distance to the first coordinate of the territory
+    const userPt = turf.point([currentLocation.lng, currentLocation.lat]);
+    const finalVisible = new Map();
+
+    // Map through candidates to strictly filter distance
+    candidateTerritories.forEach(t => {
+      if (!t.coordinates || t.coordinates.length === 0) return;
       const terrPt = turf.point([t.coordinates[0].lng, t.coordinates[0].lat]);
       const dist = turf.distance(userPt, terrPt, { units: 'kilometers' });
-      return dist <= 5;
+      if (dist <= 5) {
+        finalVisible.set(t.uid, t);
+      }
     });
-  }, [territories, currentLocation, loading, authUser]);
+
+    // Always ensure user's explicit territory is visible regardless
+    if (authUser) {
+       const ownTerritory = territories.find(t => t.uid === authUser.uid);
+       if (ownTerritory) finalVisible.set(ownTerritory.uid, ownTerritory);
+    }
+
+    return Array.from(finalVisible.values());
+  }, [territories, currentLocation, loading, authUser, spatialHash]);
 
   // Calculate Contested Zones (Intersections)
   const contestedZones = useMemo(() => {

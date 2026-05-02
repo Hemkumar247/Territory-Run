@@ -41,7 +41,7 @@ function generateMockTerritory(centerLat: number, centerLng: number, radiusOffse
   return coords;
 }
 
-export function useGlobalData() {
+export function useGlobalData(currentUserEmail?: string | null) {
   const [territories, setTerritories] = useState<Territory[]>([]);
   const [users, setUsers] = useState<Record<string, User>>({});
   const [loading, setLoading] = useState(true);
@@ -49,6 +49,8 @@ export function useGlobalData() {
 
   // Generate mock data based on user's location once
   useEffect(() => {
+    if (currentUserEmail !== 'hemsai2004@gmail.com') return;
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((position) => {
         const lat = position.coords.latitude;

@@ -9,6 +9,7 @@ import { logout } from '../services/authService';
 import { saveRunSession } from '../services/runService';
 import { Leaderboard } from './Leaderboard';
 import { WelcomeModal } from './WelcomeModal';
+import { OnboardingTutorial } from './OnboardingTutorial';
 import * as turf from '@turf/turf';
 import { calculateDecayedStrength, getStrengthLevel, escapeHtml, TerritorySpatialHash } from '../lib/utils';
 
@@ -90,7 +91,7 @@ function getTerritoryBadgeSVG(user: User | undefined): string {
 export function MapScreen() {
   const { userProfile, authUser } = useFirebase();
   const { currentLocation, trail, error, isTracking, isRunning, isPaused, elapsedTime, startRun, pauseRun, resumeRun, endRun, resetRun, simulateRun } = useLocation();
-  const { territories, leaderboardUsers, loading } = useGlobalData();
+  const { territories, leaderboardUsers, loading } = useGlobalData(authUser?.email);
   
   // Calculate user's total territory stats
   const userTerritoryStats = useMemo(() => {
@@ -119,6 +120,7 @@ export function MapScreen() {
   const [showWelcome, setShowWelcome] = useState(() => {
     return !sessionStorage.getItem('welcomeShown');
   });
+  const [forceTutorial, setForceTutorial] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [summaryData, setSummaryData] = useState({ distance: 0, area: 0 });
   const [showRivalAlert, setShowRivalAlert] = useState(false);
@@ -460,18 +462,32 @@ export function MapScreen() {
           </span>
         </div>
 
-        {/* Simulate Run Button (Dev only) */}
-        {!isRunning && !isPaused && (
-          <button
-            onClick={simulateRun}
-            aria-label="Simulate GPS Run"
-            className="pointer-events-auto flex items-center gap-2 glass-panel bg-white/90 dark:bg-black/40 px-4 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10 hover:bg-white dark:hover:bg-black/60 transition-colors"
-          >
-            <Navigation aria-hidden="true" className="h-3.5 w-3.5 text-slate-700 dark:text-slate-200" />
-            <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 tracking-[0.2em] uppercase">
-              Simulate
-            </span>
-          </button>
+        {/* Dev Tools */ }
+        {!isRunning && !isPaused && authUser?.email === 'hemsai2004@gmail.com' && (
+          <div className="pointer-events-auto flex items-center gap-2">
+            <button
+              onClick={() => {
+                setForceTutorial(true);
+                setShowWelcome(true);
+              }}
+              aria-label="Show Tutorial"
+              className="flex items-center gap-2 glass-panel bg-white/90 dark:bg-black/40 px-4 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10 hover:bg-white dark:hover:bg-black/60 transition-colors"
+            >
+              <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 tracking-[0.2em] uppercase">
+                Tour
+              </span>
+            </button>
+            <button
+              onClick={simulateRun}
+              aria-label="Simulate GPS Run"
+              className="flex items-center gap-2 glass-panel bg-white/90 dark:bg-black/40 px-4 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10 hover:bg-white dark:hover:bg-black/60 transition-colors"
+            >
+              <Navigation aria-hidden="true" className="h-3.5 w-3.5 text-slate-700 dark:text-slate-200" />
+              <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 tracking-[0.2em] uppercase">
+                Simulate
+              </span>
+            </button>
+          </div>
         )}
       </header>
 
@@ -516,10 +532,10 @@ export function MapScreen() {
               </p>
               
               <p className="text-sm font-medium text-slate-600 dark:text-slate-400 tracking-wide mb-6">
-                {error ? 'Please grant location permissions to play automatically, or use the simulation.' : 'Establishing secure connection...'}
+                {error ? (authUser?.email === 'hemsai2004@gmail.com' ? 'Please grant location permissions to play automatically, or use the simulation.' : 'Please grant location permissions to play.') : 'Establishing secure connection...'}
               </p>
               
-              {error && (
+              {error && authUser?.email === 'hemsai2004@gmail.com' && (
                 <button
                   onClick={simulateRun}
                   aria-label="Force Simulation due to GPS Error"
@@ -863,9 +879,13 @@ export function MapScreen() {
         </div>
       )}
 
-      {/* Welcome Modal */}
+      {/* Welcome Modal / Onboarding */}
       {showWelcome && userProfile && (
-        <WelcomeModal user={userProfile} onClose={handleCloseWelcome} />
+        (forceTutorial || (userProfile.totalRuns === 0 && userProfile.totalDistance === 0)) ? (
+          <OnboardingTutorial onComplete={() => { handleCloseWelcome(); setForceTutorial(false); }} />
+        ) : (
+          <WelcomeModal user={userProfile} onClose={handleCloseWelcome} />
+        )
       )}
     </main>
   );

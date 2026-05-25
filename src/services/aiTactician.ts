@@ -30,7 +30,8 @@ export const getTacticalAdvice = async (
 
     /* v8 ignore start */
     if (apiKey === 'MOCK_TEST_NO_TEXT_DIRECT') {
-      return "Tactician AI: Perimeter is exposed. Run a defensive loop today.";
+      const parsedResponse = "Tactician AI: Perimeter is exposed. Run a defensive loop today.";
+      return parsedResponse;
     }
     /* v8 ignore stop */
 

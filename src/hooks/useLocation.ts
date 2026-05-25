@@ -172,8 +172,12 @@ export function useLocation(): LocationState {
 
   const simulateRun = useCallback(() => {
     setState(s => {
-      // If the user's GPS is completely blocked or broken, give them a default start location
-      const startLocation = s.currentLocation || { lat: 37.7749, lng: -122.4194 };
+      const baseLocation = s.currentLocation || { lat: 37.7749, lng: -122.4194 };
+      // Move the starting location by a random small amount (up to ~500 meters)
+      const startLocation = {
+        lat: baseLocation.lat + (Math.random() - 0.5) * 0.005,
+        lng: baseLocation.lng + (Math.random() - 0.5) * 0.005,
+      };
       
       isSimulatingRef.current = true;
       isRunningRef.current = true;
@@ -182,6 +186,10 @@ export function useLocation(): LocationState {
       let currentLat = startLocation.lat;
       let currentLng = startLocation.lng;
       let step = 0;
+      
+      const turnRate = 3 + Math.random() * 5; // 3 to 8 degrees per second. Completes circle in 45-120 seconds.
+      const randomBaseAngle = Math.random() * Math.PI * 2;
+      const speed = 0.00003 + Math.random() * 0.00002; // vary speed
       
       if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
       
@@ -197,11 +205,10 @@ export function useLocation(): LocationState {
         }
         
         // Move in a rough circle/polygon (velocity vector rotates)
-        const angle = (step * 5) * (Math.PI / 180);
-        const speed = 0.00003; // ~3.3 meters per second (12 km/h)
+        const angle = (step * turnRate) * (Math.PI / 180) + randomBaseAngle;
         
-        currentLat += Math.cos(angle) * speed;
-        currentLng += Math.sin(angle) * speed;
+        currentLat += Math.cos(angle) * speed + (Math.random() - 0.5) * 0.000005;
+        currentLng += Math.sin(angle) * speed + (Math.random() - 0.5) * 0.000005;
         
         const newCoord = { lat: currentLat, lng: currentLng };
         const newTrailPoint = { ...newCoord, timestamp: Date.now() };

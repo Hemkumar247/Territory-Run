@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useFirebase } from './FirebaseProvider';
-import { Bell, Globe, Ruler } from 'lucide-react';
+import { Bell, Globe, Ruler, Volume2, PauseCircle } from 'lucide-react';
 import { requestNotificationPermission } from '../services/notificationService';
 
 export function GeneralSettings() {
@@ -12,6 +12,8 @@ export function GeneralSettings() {
   const [units, setUnits] = useState<'metric' | 'imperial'>(userProfile?.preferences?.units || 'metric');
   const [notifications, setNotifications] = useState(userProfile?.preferences?.notifications ?? true);
   const [publicProfile, setPublicProfile] = useState(userProfile?.preferences?.publicProfile ?? true);
+  const [audioCues, setAudioCues] = useState(userProfile?.preferences?.audioCues ?? false);
+  const [autoPause, setAutoPause] = useState(userProfile?.preferences?.autoPause ?? true);
 
   const handleToggle = async (field: string, value: any) => {
     if (!authUser) return;
@@ -37,7 +39,7 @@ export function GeneralSettings() {
 
   return (
     <div className="glass-panel bg-white/90 dark:bg-black/40 rounded-2xl p-6 border border-black/10 dark:border-white/10 space-y-6">
-      <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">General Settings</h3>
+      <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Preferences</h3>
       
       {/* Units */}
       <div className="flex items-center justify-between">
@@ -73,7 +75,7 @@ export function GeneralSettings() {
             <Bell className="h-5 w-5 text-slate-600 dark:text-slate-400" />
           </div>
           <div>
-            <p className="font-medium text-slate-900 dark:text-white">Rival Alerts</p>
+            <p className="font-medium text-slate-900 dark:text-white">Push Notifications</p>
             <p className="text-xs text-slate-500 dark:text-slate-400">Get notified when territory is contested</p>
           </div>
         </div>
@@ -82,6 +84,44 @@ export function GeneralSettings() {
           className={`w-12 h-6 rounded-full transition-colors relative ${notifications ? 'bg-teal-500' : 'bg-slate-300 dark:bg-slate-600'}`}
         >
           <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${notifications ? 'left-7' : 'left-1'}`} />
+        </button>
+      </div>
+
+      {/* Audio Cues */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800">
+            <Volume2 className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+          </div>
+          <div>
+            <p className="font-medium text-slate-900 dark:text-white">Audio Cues</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Voice feedback every km/mile</p>
+          </div>
+        </div>
+        <button
+          onClick={() => { const newVal = !audioCues; setAudioCues(newVal); handleToggle('audioCues', newVal); }}
+          className={`w-12 h-6 rounded-full transition-colors relative ${audioCues ? 'bg-teal-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+        >
+          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${audioCues ? 'left-7' : 'left-1'}`} />
+        </button>
+      </div>
+
+      {/* Auto-Pause */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800">
+            <PauseCircle className="h-5 w-5 text-slate-600 dark:text-slate-400" />
+          </div>
+          <div>
+            <p className="font-medium text-slate-900 dark:text-white">Auto-Pause</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Automatically pause when stopped</p>
+          </div>
+        </div>
+        <button
+          onClick={() => { const newVal = !autoPause; setAutoPause(newVal); handleToggle('autoPause', newVal); }}
+          className={`w-12 h-6 rounded-full transition-colors relative ${autoPause ? 'bg-teal-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+        >
+          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${autoPause ? 'left-7' : 'left-1'}`} />
         </button>
       </div>
 

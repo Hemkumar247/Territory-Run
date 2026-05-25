@@ -1,5 +1,6 @@
 import { db } from '../lib/firebase';
-import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, getDocs, query, where, arrayUnion } from 'firebase/firestore';
+import * as turf from '@turf/turf';
 import { Coordinate, Session, Territory, User } from '../types';
 import { checkAchievements } from '../lib/achievements';
 
@@ -43,22 +44,72 @@ export async function saveRunSession(
 
   // 2. Update the User's Territory if they formed a polygon
   if (territoryPolygon && territoryPolygon.length >= 3) {
-    const territoryRef = doc(db, 'territories', uid);
+    // Note: territoryPolygon is passed from MapScreen as [lat, lng], Turf needs [lng, lat]
+    const newCoords = territoryPolygon.map(p => [p[1], p[0]]);
+    const newPoly = turf.polygon([[...newCoords, newCoords[0]]]);
     
-    // Convert [lng, lat] back to {lat, lng} for storage
-    const coordinates = territoryPolygon.map(p => ({ lat: p[1], lng: p[0] }));
+    // Fetch user's existing territories
+    const territoriesQuery = query(collection(db, 'territories'), where('uid', '==', uid));
+    const qs = await getDocs(territoriesQuery);
     
-    const territoryData: Territory = {
-      uid,
-      coordinates,
-      strength: 100, // Initial strength
-      lastUpdated: serverTimestamp() as any,
-      areaKm2: territoryArea / 1000000, // Convert m2 to km2
-    };
-
-    // We use setDoc to overwrite their current territory for this prototype.
-    // In a full game, we might merge polygons.
-    await setDoc(territoryRef, territoryData);
+    let merged = false;
+    
+    for (const territoryDoc of qs.docs) {
+      const existingTerritory = territoryDoc.data() as Territory;
+      if (!existingTerritory.coordinates || existingTerritory.coordinates.length < 3) continue;
+      
+      const existingCoords = existingTerritory.coordinates.map(c => [c.lng, c.lat]);
+      const existingPoly = turf.polygon([[...existingCoords, existingCoords[0]]]);
+      
+      // Check if they intersect
+      const intersection = turf.intersect(turf.featureCollection([newPoly, existingPoly]));
+      
+      if (intersection) {
+        // They overlap. We union them.
+        const unioned = turf.union(turf.featureCollection([newPoly, existingPoly]));
+        
+        if (unioned && unioned.geometry.type === 'Polygon') {
+          // Calculate new area
+          const newArea = turf.area(unioned);
+          // Extract coords
+          const uCoords = unioned.geometry.coordinates[0];
+          const storedCoords = uCoords.map(c => ({ lat: c[1], lng: c[0] }));
+          
+          // Strength increases up to a max (e.g., 100), plus it refreshes.
+          const oldStrength = existingTerritory.strength || 0;
+          const newStrength = Math.min(100, oldStrength + 20); // add 20 to strength each time, max 100
+          
+          const updatedTerritory: Partial<Territory> = {
+            id: territoryDoc.id,
+            coordinates: storedCoords as Coordinate[],
+            strength: newStrength,
+            lastUpdated: serverTimestamp() as any,
+            areaKm2: newArea / 1000000,
+          };
+          
+          await updateDoc(territoryDoc.ref, updatedTerritory);
+          merged = true;
+          break; // Stop after first merge for simplicity
+        }
+      }
+    }
+    
+    if (!merged) {
+      // Create a brand new disjoint territory
+      const newTerritoryRef = doc(collection(db, 'territories'));
+      const storedCoords = territoryPolygon.map(p => ({ lat: p[0], lng: p[1] }));
+      
+      const newTerritoryData: Territory = {
+        uid,
+        id: newTerritoryRef.id,
+        coordinates: storedCoords,
+        strength: 100, // Initial strength
+        lastUpdated: serverTimestamp() as any,
+        areaKm2: territoryArea / 1000000,
+      };
+      
+      await setDoc(newTerritoryRef, newTerritoryData);
+    }
   }
 
   // 3. Check for new achievements

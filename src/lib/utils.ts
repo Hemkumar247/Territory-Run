@@ -113,7 +113,7 @@ export class TerritorySpatialHash {
         this.grid.set(key, []);
       }
       this.grid.get(key)!.push(territory);
-    } catch (e) {
+    } catch (_e) {
       // ignore OOB territories
     }
   }
@@ -131,7 +131,7 @@ export class TerritorySpatialHash {
             const key = `${centerLatIndex + i}_${centerLngIndex + j}`;
             const cell = this.grid.get(key);
             if (cell) {
-                cell.forEach(t => results.set(t.uid, t));
+                cell.forEach((t, index) => results.set(t.id || `${t.uid}_${index}`, t));
             }
         }
     }

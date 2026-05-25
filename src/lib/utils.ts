@@ -113,7 +113,7 @@ export class TerritorySpatialHash {
         this.grid.set(key, []);
       }
       this.grid.get(key)!.push(territory);
-    } catch (e) {
+    } catch {
       // ignore OOB territories
     }
   }

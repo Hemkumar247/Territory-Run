@@ -20,6 +20,8 @@ import { TerritoryPolygon } from './ui/TerritoryPolygon';
 import { ProfileCard } from './ui/ProfileCard';
 import { ProfileSettings } from './ProfileSettings';
 import { GeneralSettings } from './GeneralSettings';
+import { DataPermissionsSettings } from './DataPermissionsSettings';
+import { SupportSettings } from './SupportSettings';
 import { RunHistory } from './RunHistory';
 import { SocialScreen } from './SocialScreen';
 
@@ -192,19 +194,20 @@ export function MapScreen() {
     const finalVisible = new Map();
 
     // Map through candidates to strictly filter distance
-    candidateTerritories.forEach(t => {
+    candidateTerritories.forEach((t, i) => {
       if (!t.coordinates || t.coordinates.length === 0) return;
       const terrPt = turf.point([t.coordinates[0].lng, t.coordinates[0].lat]);
       const dist = turf.distance(userPt, terrPt, { units: 'kilometers' });
       if (dist <= 5) {
-        finalVisible.set(t.uid, t);
+        finalVisible.set(t.id || `${t.uid}_${i}`, t);
       }
     });
 
     // Always ensure user's explicit territory is visible regardless
     if (authUser) {
-       const ownTerritory = territories.find(t => t.uid === authUser.uid);
-       if (ownTerritory) finalVisible.set(ownTerritory.uid, ownTerritory);
+       territories.filter(t => t.uid === authUser.uid).forEach((ownTerritory, i) => {
+         finalVisible.set(ownTerritory.id || `${ownTerritory.uid}_own_${i}`, ownTerritory);
+       });
     }
 
     return Array.from(finalVisible.values());
@@ -568,7 +571,7 @@ export function MapScreen() {
             <RecenterAutomatically lat={currentLocation.lat} lng={currentLocation.lng} isRunning={isRunning} />
             
             {/* Render all saved territories from the database */}
-            {!loading && visibleTerritories.map((territory) => {
+            {!loading && visibleTerritories.map((territory, index) => {
               const polyCoords = territory.coordinates.map(c => [c.lat, c.lng] as [number, number]);
               const isCurrentUser = territory.uid === authUser?.uid;
               const color = territory.user?.territoryColor || '#3b82f6';
@@ -618,7 +621,7 @@ export function MapScreen() {
               const achs = territory.user?.achievements || [];
 
               return (
-                <React.Fragment key={territory.uid}>
+                <React.Fragment key={territory.id || `${territory.uid}-${index}`}>
                   <TerritoryPolygon 
                     positions={polyCoords}
                     color={color}
@@ -845,6 +848,10 @@ export function MapScreen() {
             <ProfileSettings />
             
             <GeneralSettings />
+
+            <DataPermissionsSettings />
+
+            <SupportSettings />
 
             <div className="glass-panel bg-white/90 dark:bg-black/40 rounded-2xl p-6 border border-black/10 dark:border-white/10">
               <div className="flex items-center justify-between">

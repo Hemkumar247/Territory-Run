@@ -16,6 +16,8 @@ export interface User {
     units: 'metric' | 'imperial';
     notifications: boolean;
     publicProfile: boolean;
+    audioCues?: boolean;
+    autoPause?: boolean;
   };
   achievements?: string[];
 }
@@ -27,6 +29,7 @@ export interface Coordinate {
 
 export interface Territory {
   uid: string;
+  id?: string;
   coordinates: Coordinate[];
   strength: number;
   lastUpdated: Date | { toDate: () => Date } | number | string | null | undefined; // Firestore Timestamp

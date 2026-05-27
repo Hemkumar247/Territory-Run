@@ -113,13 +113,13 @@ export class TerritorySpatialHash {
         this.grid.set(key, []);
       }
       this.grid.get(key)!.push(territory);
-    } catch {
+    } catch (_e) {
       // ignore OOB territories
     }
   }
 
   public queryRadius(lat: number, lng: number, radiusKm: number): any[] {
-    const results = new Map();
+    const results = new Set();
     const cellRadius = Math.ceil(radiusKm / (111 / this.resolutionMultiplier)) + 1; // Check adjacent cells
     
     const centerLatIndex = Math.floor(lat * this.resolutionMultiplier);
@@ -131,10 +131,10 @@ export class TerritorySpatialHash {
             const key = `${centerLatIndex + i}_${centerLngIndex + j}`;
             const cell = this.grid.get(key);
             if (cell) {
-                cell.forEach((t, index) => results.set(t.id || `${t.uid}_${index}`, t));
+                cell.forEach(t => results.add(t));
             }
         }
     }
-    return Array.from(results.values());
+    return Array.from(results);
   }
 }

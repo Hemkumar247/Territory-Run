@@ -176,10 +176,12 @@ export function useGlobalData(currentUserEmail?: string | null) {
 
     const allUsers = { ...mockData.users, ...users };
 
-    return allTerritories.map(t => ({
-      ...t,
-      user: allUsers[t.uid]
-    }));
+    return allTerritories
+      .map(t => ({
+        ...t,
+        user: allUsers[t.uid]
+      }))
+      .filter(t => calculateDecayedStrength(t.strength || 0, t.lastUpdated) > 0);
   }, [territories, users, mockData]);
 
   const leaderboardUsers = useMemo(() => {

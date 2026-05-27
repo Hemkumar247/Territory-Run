@@ -191,26 +191,26 @@ export function MapScreen() {
     );
 
     const userPt = turf.point([currentLocation.lng, currentLocation.lat]);
-    const finalVisible = new Map();
+    const finalVisible = new Set<any>();
 
     // Map through candidates to strictly filter distance
-    candidateTerritories.forEach((t, i) => {
+    candidateTerritories.forEach(t => {
       if (!t.coordinates || t.coordinates.length === 0) return;
       const terrPt = turf.point([t.coordinates[0].lng, t.coordinates[0].lat]);
       const dist = turf.distance(userPt, terrPt, { units: 'kilometers' });
       if (dist <= 5) {
-        finalVisible.set(t.id || `${t.uid}_${i}`, t);
+        finalVisible.add(t);
       }
     });
 
     // Always ensure user's explicit territory is visible regardless
     if (authUser) {
-       territories.filter(t => t.uid === authUser.uid).forEach((ownTerritory, i) => {
-         finalVisible.set(ownTerritory.id || `${ownTerritory.uid}_own_${i}`, ownTerritory);
+       territories.filter(t => t.uid === authUser.uid).forEach(ownTerritory => {
+         finalVisible.add(ownTerritory);
        });
     }
 
-    return Array.from(finalVisible.values());
+    return Array.from(finalVisible);
   }, [territories, currentLocation, loading, authUser, spatialHash]);
 
   // Calculate Contested Zones (Intersections)
@@ -236,7 +236,7 @@ export function MapScreen() {
             const intersection = turf.intersect(turf.featureCollection([poly1, poly2]));
             if (intersection) {
               zones.push({
-                id: `${t1.uid}-${t2.uid}`,
+                id: `${t1.id || t1.uid}-${t2.id || t2.uid}`,
                 geometry: intersection.geometry,
                 users: [t1.user, t2.user]
               });

@@ -19,7 +19,8 @@ export function AuthScreen() {
 
     try {
       if (isLogin) {
-        await signInWithEmailAndPassword(auth, email, password);
+        const result = await signInWithEmailAndPassword(auth, email, password);
+        await checkAndCreateUserProfile(result.user);
       } else {
         if (!displayName.trim()) {
           throw new Error('Display name is required for registration.');

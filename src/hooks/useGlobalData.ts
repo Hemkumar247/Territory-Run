@@ -194,10 +194,13 @@ export function useGlobalData(currentUserEmail?: string | null) {
       userStrengths[t.uid] = (userStrengths[t.uid] || 0) + decayed;
     });
 
-    return Object.values(allUsers).map(user => ({
-      ...user,
-      territoryStrength: userStrengths[user.uid] || 0
-    })).sort((a, b) => (b.territoryStrength || 0) - (a.territoryStrength || 0));
+    return Object.values(allUsers)
+      .map(user => ({
+        ...user,
+        territoryStrength: userStrengths[user.uid] || 0
+      }))
+      .filter(user => (user.territoryStrength || 0) > 0)
+      .sort((a, b) => (b.territoryStrength || 0) - (a.territoryStrength || 0));
   }, [users, mockData, enrichedTerritories]);
 
   return { territories: enrichedTerritories, leaderboardUsers, loading };

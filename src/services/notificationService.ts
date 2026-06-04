@@ -10,6 +10,7 @@ export interface AppNotification {
   timestamp: any;
   read: boolean;
   relatedUserId?: string;
+  data?: any;
 }
 
 export const requestNotificationPermission = async () => {
@@ -45,7 +46,8 @@ export const sendNotification = async (
   targetUserId: string, 
   type: AppNotification['type'], 
   message: string, 
-  relatedUserId?: string
+  relatedUserId?: string,
+  data?: any
 ) => {
   try {
     const notifRef = doc(collection(db, 'users', targetUserId, 'notifications'));
@@ -55,7 +57,8 @@ export const sendNotification = async (
       message,
       timestamp: serverTimestamp(),
       read: false,
-      relatedUserId
+      relatedUserId,
+      data
     };
     
     await setDoc(notifRef, notification);

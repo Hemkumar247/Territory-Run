@@ -11,6 +11,7 @@ export interface BottomHUDProps extends React.HTMLAttributes<HTMLDivElement> {
   distance: string;
   pace: string;
   time: string;
+  area: string;
   onStart: () => void;
   onPause: () => void;
   onResume: () => void;
@@ -18,7 +19,7 @@ export interface BottomHUDProps extends React.HTMLAttributes<HTMLDivElement> {
 }
 
 export const BottomHUD = React.forwardRef<HTMLDivElement, BottomHUDProps>(
-  ({ className, isRunning, isPaused, distance, pace, time, onStart, onPause, onResume, onStop, ...props }, ref) => {
+  ({ className, isRunning, isPaused, distance, pace, time, area, onStart, onPause, onResume, onStop, ...props }, ref) => {
     return (
       <section
         aria-label="Live Run Tracking Dashboard"
@@ -29,10 +30,12 @@ export const BottomHUD = React.forwardRef<HTMLDivElement, BottomHUDProps>(
         <GlassCard variant="elevated" className="max-w-md mx-auto p-6 rounded-[32px] flex flex-col gap-6 w-full">
           <div className="flex justify-evenly items-center w-full">
             <StatsDisplay className="flex-1" label="Distance" value={distance} unit="km" colorClass="text-[#008B99] dark:text-[#00E5FF] drop-shadow-[0_0_8px_rgba(0,139,153,0.8)] dark:drop-shadow-[0_0_8px_rgba(0,229,255,0.8)]" />
-            <div className="w-[1px] h-10 bg-slate-300 dark:bg-white/10 shrink-0" />
+            <div className="w-[1px] h-10 bg-slate-300 dark:bg-white/10 shrink-0 mx-1" />
             <StatsDisplay className="flex-1" label="Pace" value={pace} unit="/km" colorClass="text-[#5A1CB3] dark:text-[#7B2FFF] drop-shadow-[0_0_8px_rgba(90,28,179,0.8)] dark:drop-shadow-[0_0_8px_rgba(123,47,255,0.8)]" />
-            <div className="w-[1px] h-10 bg-slate-300 dark:bg-white/10 shrink-0" />
+            <div className="w-[1px] h-10 bg-slate-300 dark:bg-white/10 shrink-0 mx-1" />
             <StatsDisplay className="flex-1" label="Time" value={time} colorClass="text-[#B38000] dark:text-[#FFB800] drop-shadow-[0_0_8px_rgba(179,128,0,0.8)] dark:drop-shadow-[0_0_8px_rgba(255,184,0,0.8)]" />
+            <div className="w-[1px] h-10 bg-slate-300 dark:bg-white/10 shrink-0 mx-1" />
+            <StatsDisplay className="flex-1" label="Area" value={area} unit="m²" colorClass="text-[#10B981] dark:text-[#34D399] drop-shadow-[0_0_8px_rgba(16,185,129,0.8)] dark:drop-shadow-[0_0_8px_rgba(52,211,153,0.8)]" />
           </div>
 
           <div className="flex justify-center items-center gap-4">

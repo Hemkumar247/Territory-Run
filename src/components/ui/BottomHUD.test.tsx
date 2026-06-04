@@ -12,6 +12,7 @@ describe('BottomHUD Component', () => {
         distance="0.0" 
         pace="0'00" 
         time="00:00"
+        area="0"
         onStart={() => {}} onPause={() => {}} onResume={() => {}} onStop={() => {}} 
       />
     );
@@ -26,6 +27,7 @@ describe('BottomHUD Component', () => {
         distance="1.0" 
         pace="5'00" 
         time="05:00"
+        area="500"
         onStart={() => {}} onPause={() => {}} onResume={() => {}} onStop={() => {}} 
       />
     );
@@ -42,6 +44,7 @@ describe('BottomHUD Component', () => {
         distance="1.0" 
         pace="5'00" 
         time="05:00"
+        area="500"
         onStart={() => {}} onPause={() => {}} onResume={handleResume} onStop={() => {}} 
       />
     );

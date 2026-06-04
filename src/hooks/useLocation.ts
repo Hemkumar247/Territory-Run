@@ -60,28 +60,45 @@ export function useLocation(): LocationState {
 
     setState((s) => ({ ...s, isTracking: true }));
 
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        if (isSimulatingRef.current) return; // Ignore real GPS if simulating
-        
-        const { latitude, longitude } = position.coords;
-        const newCoord = { lat: latitude, lng: longitude };
-        
-        setState((prev) => {
-          // Compare with last point to prevent identical stacking but allow micro-movements
-          const lastPoint = prev.trail[prev.trail.length - 1];
-          if (isRunningRef.current && !isPausedRef.current && lastPoint && lastPoint.lat === latitude && lastPoint.lng === longitude) {
-            return { ...prev, currentLocation: newCoord, error: null };
-          }
-          
-          const newTrailPoint = { ...newCoord, timestamp: Date.now() };
+    const processLocationUpdate = (latitude: number, longitude: number, accuracy: number) => {
+      const newCoord = { lat: latitude, lng: longitude };
+      
+      setState((prev) => {
+        if (!isRunningRef.current || isPausedRef.current) {
           return {
             ...prev,
             currentLocation: newCoord,
-            trail: isRunningRef.current && !isPausedRef.current ? [...prev.trail, newTrailPoint] : prev.trail,
             error: null,
           };
-        });
+        }
+
+        const lastPoint = prev.trail[prev.trail.length - 1];
+        if (lastPoint) {
+          const from = turf.point([lastPoint.lng, lastPoint.lat]);
+          const to = turf.point([longitude, latitude]);
+          const distance = turf.distance(from, to, { units: 'kilometers' });
+          
+          // Ignore if moved less than 3 meters (GPS noise) or accuracy is terrible (> 50m)
+          // 0.003 km = 3 meters
+          if (distance < 0.003 || accuracy > 50) {
+            return { ...prev, currentLocation: newCoord, error: null };
+          }
+        }
+        
+        const newTrailPoint = { ...newCoord, timestamp: Date.now() };
+        return {
+          ...prev,
+          currentLocation: newCoord,
+          trail: [...prev.trail, newTrailPoint],
+          error: null,
+        };
+      });
+    };
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        if (isSimulatingRef.current) return; // Ignore real GPS if simulating
+        processLocationUpdate(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
       },
       (error) => {
         if (isSimulatingRef.current) return;
@@ -114,22 +131,7 @@ export function useLocation(): LocationState {
       if (!isSimulatingRef.current && isRunningRef.current && !isPausedRef.current) {
         navigator.geolocation.getCurrentPosition(
           (position) => {
-            const { latitude, longitude } = position.coords;
-            const newCoord = { lat: latitude, lng: longitude };
-            
-            setState((prev) => {
-              const lastPoint = prev.trail[prev.trail.length - 1];
-              if (lastPoint && lastPoint.lat === latitude && lastPoint.lng === longitude) {
-                return prev; // Ignore identical to prevent thrashing
-              }
-              const newTrailPoint = { ...newCoord, timestamp: Date.now() };
-              return {
-                ...prev,
-                currentLocation: newCoord,
-                trail: [...prev.trail, newTrailPoint],
-                error: null,
-              };
-            });
+            processLocationUpdate(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
           },
           () => {}, // Ignore errors for background polls
           { enableHighAccuracy: true, maximumAge: 0, timeout: 3000 }

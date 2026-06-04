@@ -196,7 +196,7 @@ export function RunHistory() {
                       <span className="text-[10px] uppercase tracking-wider font-semibold">Gained</span>
                     </div>
                     <p className="text-xl font-display font-bold text-emerald-600 dark:text-emerald-400">
-                      {session.territoryGained > 0 ? (session.territoryGained / 1000000).toFixed(2) : '0'} <span className="text-xs font-sans text-emerald-600/70 dark:text-emerald-400/70">km²</span>
+                      {session.territoryGained > 0 ? Math.round(session.territoryGained).toLocaleString() : '0'} <span className="text-xs font-sans text-emerald-600/70 dark:text-emerald-400/70">m²</span>
                     </p>
                   </div>
                 </div>

@@ -12,6 +12,7 @@ import { WelcomeModal } from './WelcomeModal';
 import { OnboardingTutorial } from './OnboardingTutorial';
 import * as turf from '@turf/turf';
 import { calculateDecayedStrength, getStrengthLevel, escapeHtml, TerritorySpatialHash } from '../lib/utils';
+import { requestNotificationPermission, listenToNotifications, markNotificationAsRead, AppNotification } from '../services/notificationService';
 
 import { NavigationTabBar } from './ui/NavigationTabBar';
 import { BottomHUD } from './ui/BottomHUD';
@@ -125,27 +126,56 @@ export function MapScreen() {
   const [forceTutorial, setForceTutorial] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [summaryData, setSummaryData] = useState({ distance: 0, area: 0 });
-  const [showRivalAlert, setShowRivalAlert] = useState(false);
+  const [activeNotification, setActiveNotification] = useState<AppNotification | null>(null);
 
   const handleCloseWelcome = () => {
     sessionStorage.setItem('welcomeShown', 'true');
     setShowWelcome(false);
   };
 
-  // Randomly show rival alert during a run
   useEffect(() => {
-    if (isRunning && !isPaused) {
-      const interval = setInterval(() => {
-        if (Math.random() > 0.8) {
-          setShowRivalAlert(true);
-          setTimeout(() => setShowRivalAlert(false), 5000);
-        }
-      }, 15000);
-      return () => clearInterval(interval);
-    } else {
-      setShowRivalAlert(false);
+    if (!authUser) return;
+    
+    if (userProfile?.preferences?.notifications !== false) {
+      requestNotificationPermission();
     }
-  }, [isRunning, isPaused]);
+
+    const shouldShow = userProfile?.preferences?.notifications !== false;
+
+    const unsubscribe = listenToNotifications(authUser.uid, shouldShow, (notifications) => {
+      // Pick the first unread notification that is related to territory
+      const relevant = notifications.find(n => n.type === 'territory_contested' || n.type === 'territory_lost');
+      if (relevant) {
+        setActiveNotification(relevant);
+        // Automatically mark as read after 10 seconds if not interacted with
+        setTimeout(() => {
+          setActiveNotification(current => {
+            if (current?.id === relevant.id) return null;
+            return current;
+          });
+          markNotificationAsRead(authUser.uid, relevant.id);
+        }, 10000);
+      } else {
+        // Just mark others as read
+        notifications.forEach(notif => markNotificationAsRead(authUser.uid, notif.id));
+        setActiveNotification(null);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [authUser, userProfile?.preferences?.notifications]);
+
+  const [mapInstance, setMapInstance] = useState<L.Map | null>(null);
+
+  const handleDefend = () => {
+    if (activeNotification) {
+      if (activeNotification.data && activeNotification.data.lat && activeNotification.data.lng && mapInstance) {
+        mapInstance.flyTo([activeNotification.data.lat, activeNotification.data.lng], 16, { animate: true, duration: 2 });
+      }
+      markNotificationAsRead(authUser!.uid, activeNotification.id);
+      setActiveNotification(null);
+    }
+  };
 
   // Toggle dark mode class on document
   useEffect(() => {
@@ -331,7 +361,8 @@ export function MapScreen() {
                 t.uid,
                 'territory_contested',
                 `${userProfile.displayName} is contesting your territory!`,
-                authUser.uid
+                authUser.uid,
+                { lat: currentLocation.lat, lng: currentLocation.lng }
               );
             });
             notifiedUsersRef.current.add(t.uid);
@@ -365,13 +396,25 @@ export function MapScreen() {
       
       // Send territory_lost notifications to users we contested
       if (territoryPolygon && territoryPolygon.length >= 3) {
+        let center = currentLocation || { lat: 0, lng: 0 };
+        try {
+          const tCoords = territoryPolygon.map(c => [c[1], c[0]]);
+          tCoords.push([...tCoords[0]]);
+          const poly = turf.polygon([tCoords]);
+          const centroid = turf.centroid(poly);
+          center = { lat: centroid.geometry.coordinates[1], lng: centroid.geometry.coordinates[0] };
+        } catch (e) {
+          // fallback to currentLocation
+        }
+        
         import('../services/notificationService').then(({ sendNotification }) => {
           notifiedUsersRef.current.forEach(targetUid => {
             sendNotification(
               targetUid,
               'territory_lost',
               `${userProfile.displayName} has claimed part of your territory!`,
-              authUser.uid
+              authUser.uid,
+              center
             );
           });
         });
@@ -551,6 +594,7 @@ export function MapScreen() {
           </div>
         ) : (
           <MapContainer 
+            ref={setMapInstance}
             center={[currentLocation.lat, currentLocation.lng]} 
             zoom={16} 
             className="h-full w-full bg-slate-100 dark:bg-[#050505]"
@@ -754,14 +798,17 @@ export function MapScreen() {
       {/* Bottom HUD & Navigation */}
       {activeTab === 'map' && (
         <>
-          {/* Rival Alert Banner (Example) */}
+          {/* Real Notification Banner */}
           <div className="absolute top-24 left-0 right-0 z-[1000] pointer-events-none">
-            {showRivalAlert && (
-              <RivalAlertBanner 
-                rivalName="NeonGhost" 
-                territoryName="Downtown Sector" 
-                timeAgo="Just now" 
-              />
+            {activeNotification && (
+              <div className="pointer-events-auto">
+                <RivalAlertBanner 
+                  rivalName={activeNotification.message.split(' ')[0] || "A rival"} 
+                  territoryName={activeNotification.type === 'territory_contested' ? "Your Territory" : "Lost Territory"} 
+                  timeAgo="Just now" 
+                  onAction={handleDefend}
+                />
+              </div>
             )}
           </div>
 
@@ -772,6 +819,7 @@ export function MapScreen() {
             distance={distance.toFixed(2)}
             pace={formatPace(distance, elapsedTime)}
             time={formatTime(elapsedTime)}
+            area={Math.round(territoryArea).toLocaleString()}
             onStart={startRun}
             onPause={pauseRun}
             onResume={resumeRun}

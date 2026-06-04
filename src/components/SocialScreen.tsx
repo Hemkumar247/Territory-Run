@@ -22,6 +22,7 @@ export function SocialScreen({ onClose }: { onClose: () => void }) {
   const [updateError, setUpdateError] = useState<string | null>(null);
 
   const [friendToRemove, setFriendToRemove] = useState<User | null>(null);
+  const [selectedFriend, setSelectedFriend] = useState<User | null>(null);
 
   useEffect(() => {
     if (!authUser || !userProfile) return;
@@ -261,7 +262,7 @@ export function SocialScreen({ onClose }: { onClose: () => void }) {
           ) : (
             <div className="space-y-3">
               {friends.map(friend => (
-                <div key={friend.uid} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/30 rounded-xl">
+                <div key={friend.uid} onClick={() => setSelectedFriend(friend)} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800/30 rounded-xl cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800/50 transition-colors">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-inner" style={{ backgroundColor: friend.territoryColor }}>
                       {friend.displayName.charAt(0).toUpperCase()}
@@ -272,7 +273,7 @@ export function SocialScreen({ onClose }: { onClose: () => void }) {
                     </div>
                   </div>
                   <button 
-                    onClick={() => setFriendToRemove(friend)}
+                    onClick={(e) => { e.stopPropagation(); setFriendToRemove(friend); }}
                     className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-full transition-colors"
                   >
                     <UserX className="w-4 h-4" />
@@ -312,6 +313,54 @@ export function SocialScreen({ onClose }: { onClose: () => void }) {
                 Remove
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Friend Stats Modal */}
+      {selectedFriend && (
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onClick={() => setSelectedFriend(null)}>
+          <div className="w-full max-w-sm glass-panel bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-2xl border border-black/10 dark:border-white/10 scale-in duration-200" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-start mb-6">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-full flex items-center justify-center text-white font-bold text-2xl shadow-inner" style={{ backgroundColor: selectedFriend.territoryColor }}>
+                  {selectedFriend.displayName.charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-xl font-display font-bold text-slate-900 dark:text-white">{selectedFriend.displayName}</h3>
+                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Level {Math.floor((selectedFriend.totalDistance || 0) / 10) + 1}</p>
+                </div>
+              </div>
+              <button onClick={() => setSelectedFriend(null)} className="p-2 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl">
+                <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Total Distance</p>
+                <p className="text-xl font-bold text-slate-900 dark:text-white">{selectedFriend.totalDistance?.toFixed(1) || '0.0'} <span className="text-sm font-normal text-slate-500">km</span></p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl">
+                <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Total Runs</p>
+                <p className="text-xl font-bold text-slate-900 dark:text-white">{selectedFriend.totalRuns || 0}</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl">
+                <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Wins</p>
+                <p className="text-xl font-bold text-slate-900 dark:text-white">{selectedFriend.wins || 0}</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl">
+                <p className="text-xs text-slate-500 font-medium uppercase tracking-wider mb-1">Losses</p>
+                <p className="text-xl font-bold text-slate-900 dark:text-white">{selectedFriend.losses || 0}</p>
+              </div>
+            </div>
+            
+            <button
+              onClick={() => setSelectedFriend(null)}
+              className="w-full mt-6 py-3 rounded-xl bg-teal-500 text-white font-bold text-sm transition-colors cursor-pointer hover:bg-teal-600 shadow-lg shadow-teal-500/20"
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

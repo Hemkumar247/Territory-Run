@@ -31,14 +31,26 @@ export const requestNotificationPermission = async () => {
   return false;
 };
 
-export const showBrowserNotification = (title: string, options?: NotificationOptions) => {
-  if (!('Notification' in window)) return;
-  
-  if (Notification.permission === 'granted') {
-    new Notification(title, {
-      icon: '/vite.svg', // Placeholder icon
-      ...options
-    });
+export const showBrowserNotification = async (title: string, options?: NotificationOptions) => {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+
+  const notificationOptions: NotificationOptions = {
+    icon: '/pwa-192x192.png',
+    badge: '/pwa-192x192.png',
+    ...options,
+  };
+
+  try {
+    if ('serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration) {
+        await registration.showNotification(title, notificationOptions);
+        return;
+      }
+    }
+    new Notification(title, notificationOptions);
+  } catch {
+    // Ignore notification errors in restricted WebViews
   }
 };
 
@@ -104,7 +116,7 @@ export const listenToNotifications = (
           // We check if timestamp is recent to avoid showing old unread ones on load
           const isRecent = data.timestamp && (Date.now() - data.timestamp.toMillis() < 10000);
           if (isRecent || !data.timestamp) { // !data.timestamp means it's a local optimistic update
-            showBrowserNotification('Neon Run', {
+            showBrowserNotification('Territory Run', {
               body: data.message,
               tag: data.id // Prevent duplicates
             });

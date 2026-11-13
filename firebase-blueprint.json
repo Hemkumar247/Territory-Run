@@ -35,6 +35,21 @@
         "achievements": {
           "type": "array",
           "items": { "type": "string" }
+        },
+        "currentStreak": {
+          "type": "number",
+          "description": "Current consecutive daily run streak count"
+        },
+        "longestStreak": {
+          "type": "number",
+          "description": "All-time longest consecutive daily run streak count"
+        },
+        "lastRunDate": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "maxLength": 10,
+          "minLength": 10,
+          "description": "Local calendar date (YYYY-MM-DD) of the user's most recent completed run"
         }
       },
       "required": ["uid", "displayName", "territoryColor", "totalDistance", "territoryStrength", "lastActive", "wins", "losses"]

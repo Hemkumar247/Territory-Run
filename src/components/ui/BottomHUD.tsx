@@ -24,7 +24,7 @@ export const BottomHUD = React.forwardRef<HTMLDivElement, BottomHUDProps>(
       <section
         aria-label="Live Run Tracking Dashboard"
         ref={ref}
-        className={cn('fixed bottom-0 left-0 right-0 p-4 pb-8 z-50', className)}
+        className={cn('fixed bottom-0 left-0 right-0 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] z-50 touch-manipulation', className)}
         {...props}
       >
         <GlassCard variant="elevated" className="max-w-md mx-auto p-6 rounded-[32px] flex flex-col gap-6 w-full">

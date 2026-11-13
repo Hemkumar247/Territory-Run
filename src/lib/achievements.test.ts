@@ -73,4 +73,12 @@ describe('Achievements Logic', () => {
     expect(newAchievements).toContain('night_owl');
     vi.useRealTimers();
   });
+
+  it('unlocks streak_3 and streak_7 when reaching 3 and 7 consecutive run days', () => {
+    const user = { ...dummyUserBase } as User;
+    expect(checkAchievements(user, { distanceCovered: 1000, territoryGained: 0, nextStreak: 3 })).toContain('streak_3');
+    expect(checkAchievements(user, { distanceCovered: 1000, territoryGained: 0, nextStreak: 7 })).toEqual(
+      expect.arrayContaining(['streak_3', 'streak_7'])
+    );
+  });
 });

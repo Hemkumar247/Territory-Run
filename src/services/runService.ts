@@ -3,6 +3,8 @@ import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, getDocs
 import * as turf from '@turf/turf';
 import { Coordinate, Session, Territory, User } from '../types';
 import { checkAchievements } from '../lib/achievements';
+import { calculateNextStreak } from '../lib/streak';
+import { handleFirestoreError, OperationType } from '../lib/errors';
 
 /**
  * Persists a completed run session to the Firestore database.
@@ -112,18 +114,25 @@ export async function saveRunSession(
     }
   }
 
-  // 3. Check for new achievements
+  // 3. Calculate updated daily active streak
+  const streakUpdate = calculateNextStreak(userProfile, endTime);
+
+  // 4. Check for new achievements
   const newAchievements = checkAchievements(userProfile, {
     distanceCovered,
-    territoryGained: territoryArea
+    territoryGained: territoryArea,
+    nextStreak: streakUpdate.currentStreak,
   });
 
-  // 4. Update the User Profile
+  // 5. Update the User Profile
   const userRef = doc(db, 'users', uid);
   const userUpdates: Record<string, unknown> = {
     totalDistance: increment(distanceCovered),
     totalRuns: increment(1),
     lastActive: serverTimestamp(),
+    currentStreak: streakUpdate.currentStreak,
+    longestStreak: streakUpdate.longestStreak,
+    lastRunDate: streakUpdate.lastRunDate,
   };
   
   if (territoryPolygon && territoryPolygon.length >= 3) {
@@ -134,7 +143,11 @@ export async function saveRunSession(
     userUpdates.achievements = arrayUnion(...newAchievements);
   }
 
-  await updateDoc(userRef, userUpdates);
+  try {
+    await updateDoc(userRef, userUpdates);
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `users/${uid}`);
+  }
   
   return newAchievements;
 }

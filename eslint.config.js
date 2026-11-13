@@ -4,7 +4,7 @@ import globals from 'globals';
 
 export default tseslint.config(
   {
-    ignores: ['dist/**', 'node_modules/**', '.next/**', 'build/**']
+    ignores: ['dist/**', 'dev-dist/**', 'node_modules/**', '.next/**', 'build/**']
   },
   {
     languageOptions: {

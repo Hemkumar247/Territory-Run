@@ -5,7 +5,7 @@ export interface Achievement {
   title: string;
   description: string;
   icon: string; // We'll map this to a Lucide icon in the UI
-  check: (user: User, newStats: { distanceCovered: number, territoryGained: number }) => boolean;
+  check: (user: User, newStats: { distanceCovered: number, territoryGained: number, nextStreak?: number }) => boolean;
 }
 
 export const ACHIEVEMENTS: Achievement[] = [
@@ -50,10 +50,24 @@ export const ACHIEVEMENTS: Achievement[] = [
     description: 'Run a total of 100 km.',
     icon: 'Trophy',
     check: (user, newStats) => (user.totalDistance + newStats.distanceCovered) >= 100000
+  },
+  {
+    id: 'streak_3',
+    title: '3-Day Streak',
+    description: 'Run 3 consecutive days.',
+    icon: 'Flame',
+    check: (_user, newStats) => (newStats.nextStreak || 0) >= 3
+  },
+  {
+    id: 'streak_7',
+    title: 'Week Warrior',
+    description: 'Maintain a 7-day active streak.',
+    icon: 'Zap',
+    check: (_user, newStats) => (newStats.nextStreak || 0) >= 7
   }
 ];
 
-export function checkAchievements(user: User, newStats: { distanceCovered: number, territoryGained: number }): string[] {
+export function checkAchievements(user: User, newStats: { distanceCovered: number, territoryGained: number, nextStreak?: number }): string[] {
   const currentAchievements = user.achievements || [];
   const newAchievements: string[] = [];
 

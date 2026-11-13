@@ -25,7 +25,7 @@ export const NavigationTabBar = React.forwardRef<HTMLDivElement, NavigationTabBa
       <nav
         aria-label="Bottom Navigation"
         ref={ref}
-        className={cn('fixed bottom-0 left-0 right-0 p-4 pb-8 z-[3000] pointer-events-none', className)}
+        className={cn('fixed bottom-0 left-0 right-0 p-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] z-[3000] pointer-events-none touch-manipulation', className)}
         {...props}
       >
         <GlassCard role="tablist" variant="base" className="max-w-md mx-auto rounded-[24px] pointer-events-auto flex justify-around items-center p-2">

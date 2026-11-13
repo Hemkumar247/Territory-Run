@@ -3,6 +3,7 @@ import { Mail, Lock, User, ArrowRight, Loader2, Map } from 'lucide-react';
 import { signInWithGoogle, checkAndCreateUserProfile } from '../services/authService';
 import { auth } from '../lib/firebase';
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { PWAInstallButton } from './PWAInstallButton';
 
 export function AuthScreen() {
   const [isLogin, setIsLogin] = useState(true);
@@ -49,7 +50,12 @@ export function AuthScreen() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-slate-100 dark:bg-[#050505] px-4 py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+    <div className="flex min-h-[100dvh] flex-col items-center justify-center bg-slate-100 dark:bg-[#050505] px-4 py-12 sm:px-6 lg:px-8 relative overflow-hidden">
+      {/* Top-right Android/Mobile install action */}
+      <div className="absolute top-[max(1rem,env(safe-area-inset-top))] right-4 z-20">
+        <PWAInstallButton variant="compact" />
+      </div>
+
       {/* Ambient Background Glows */}
       <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-teal-500/20 rounded-full blur-[120px] mix-blend-screen pointer-events-none" />
       <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-[120px] mix-blend-screen pointer-events-none" />

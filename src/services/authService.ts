@@ -1,6 +1,7 @@
 import { auth, db, googleProvider } from '../lib/firebase';
 import { 
-  signInWithPopup, 
+  signInWithPopup,
+  signInWithRedirect,
   signOut, 
   User as FirebaseUser 
 } from 'firebase/auth';
@@ -31,6 +32,8 @@ export const checkAndCreateUserProfile = async (user: FirebaseUser, customDispla
         lastActive: serverTimestamp(),
         wins: 0,
         losses: 0,
+        currentStreak: 0,
+        longestStreak: 0,
         friendCode: generateFriendCode(),
         friends: [],
         friendRequests: []
@@ -58,7 +61,15 @@ export const signInWithGoogle = async () => {
     const result = await signInWithPopup(auth, googleProvider);
     await checkAndCreateUserProfile(result.user);
     return result.user;
-  } catch (error) {
+  } catch (error: any) {
+    const code = error?.code || '';
+    if (
+      code === 'auth/popup-blocked' ||
+      code === 'auth/operation-not-supported-in-this-environment'
+    ) {
+      await signInWithRedirect(auth, googleProvider);
+      return null;
+    }
     console.error("Google Sign-In Error:", error);
     throw error;
   }

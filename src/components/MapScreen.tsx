@@ -4,7 +4,7 @@ import L from 'leaflet';
 import { useLocation } from '../hooks/useLocation';
 import { useFirebase } from './FirebaseProvider';
 import { useGlobalData } from '../hooks/useGlobalData';
-import { LogOut, Navigation, AlertTriangle, Loader2, Moon, Sun, Play, X, CheckCircle2 } from 'lucide-react';
+import { LogOut, Navigation, AlertTriangle, Loader2, Moon, Sun, Play, X, CheckCircle2, Flame } from 'lucide-react';
 import { logout } from '../services/authService';
 import { saveRunSession } from '../services/runService';
 import { Leaderboard } from './Leaderboard';
@@ -12,6 +12,7 @@ import { WelcomeModal } from './WelcomeModal';
 import { OnboardingTutorial } from './OnboardingTutorial';
 import * as turf from '@turf/turf';
 import { calculateDecayedStrength, getStrengthLevel, escapeHtml, TerritorySpatialHash } from '../lib/utils';
+import { calculateNextStreak } from '../lib/streak';
 import { requestNotificationPermission, listenToNotifications, markNotificationAsRead, AppNotification } from '../services/notificationService';
 
 import { NavigationTabBar } from './ui/NavigationTabBar';
@@ -25,6 +26,8 @@ import { DataPermissionsSettings } from './DataPermissionsSettings';
 import { SupportSettings } from './SupportSettings';
 import { RunHistory } from './RunHistory';
 import { SocialScreen } from './SocialScreen';
+import { useWakeLock } from '../hooks/useWakeLock';
+import { PWAInstallButton } from './PWAInstallButton';
 
 // Fix for default Leaflet icon missing in Vite/Webpack
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -118,6 +121,7 @@ export function MapScreen() {
   }, [territories, authUser]);
   
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [showSummary, setShowSummary] = useState(false);
   const [activeTab, setActiveTab] = useState<'map' | 'leaderboard' | 'history' | 'profile' | 'settings' | 'social'>('map');
   const [showWelcome, setShowWelcome] = useState(() => {
@@ -125,8 +129,41 @@ export function MapScreen() {
   });
   const [forceTutorial, setForceTutorial] = useState(false);
   const [isDarkMode, setIsDarkMode] = useState(true);
-  const [summaryData, setSummaryData] = useState({ distance: 0, area: 0 });
+  const [summaryData, setSummaryData] = useState({ distance: 0, area: 0, streak: 0 });
   const [activeNotification, setActiveNotification] = useState<AppNotification | null>(null);
+
+  // Keep Android screen awake during active GPS runs
+  useWakeLock(isRunning && !isPaused);
+
+  const triggerHaptic = (pattern: number | number[] = 30) => {
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate(pattern);
+      } catch {
+        // Ignore vibrate restrictions
+      }
+    }
+  };
+
+  // Support Android hardware/gesture back button for sub-tabs and summary modal
+  useEffect(() => {
+    if (activeTab !== 'map' || showSummary) {
+      window.history.pushState({ territoryView: activeTab, showSummary }, '');
+    }
+  }, [activeTab, showSummary]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (showSummary) {
+        setShowSummary(false);
+        setNewAchievements([]);
+      } else if (activeTab !== 'map') {
+        setActiveTab('map');
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [activeTab, showSummary]);
 
   const handleCloseWelcome = () => {
     sessionStorage.setItem('welcomeShown', 'true');
@@ -177,12 +214,16 @@ export function MapScreen() {
     }
   };
 
-  // Toggle dark mode class on document
+  // Toggle dark mode class and Android status bar theme-color
   useEffect(() => {
     if (isDarkMode) {
       document.documentElement.classList.add('dark');
     } else {
       document.documentElement.classList.remove('dark');
+    }
+    const themeMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeMeta) {
+      themeMeta.setAttribute('content', isDarkMode ? '#080B12' : '#F1F5F9');
     }
   }, [isDarkMode]);
 
@@ -403,7 +444,7 @@ export function MapScreen() {
           const poly = turf.polygon([tCoords]);
           const centroid = turf.centroid(poly);
           center = { lat: centroid.geometry.coordinates[1], lng: centroid.geometry.coordinates[0] };
-        } catch (e) {
+        } catch (_e) {
           // fallback to currentLocation
         }
         
@@ -420,15 +461,20 @@ export function MapScreen() {
         });
       }
       
-      setSummaryData({ distance, area: territoryArea });
+      const nextStreak = calculateNextStreak(userProfile);
+      setSummaryData({ distance, area: territoryArea, streak: nextStreak.currentStreak });
       if (unlockedAchievements && unlockedAchievements.length > 0) {
         setNewAchievements(unlockedAchievements);
+        triggerHaptic([40, 60, 80]);
+      } else {
+        triggerHaptic(50);
       }
+      setSaveError(null);
       setShowSummary(true);
       resetRun();
     } catch (err) {
       console.error("Failed to save run:", err);
-      alert("Failed to save run. Please try again.");
+      setSaveError("Failed to save run. Please check your connection and try again.");
     } finally {
       setIsSaving(false);
     }
@@ -436,7 +482,7 @@ export function MapScreen() {
 
   if (isSaving) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center bg-slate-100/80 dark:bg-[#050505]/80 backdrop-blur-md z-[2000] fixed inset-0">
+      <div className="flex h-[100dvh] flex-col items-center justify-center bg-slate-100/80 dark:bg-[#050505]/80 backdrop-blur-md z-[2000] fixed inset-0">
         <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mb-4" />
         <h2 className="text-xl font-bold font-display text-slate-900 dark:text-white">Conquering territory...</h2>
         <p className="text-slate-500 dark:text-slate-400">Saving your run data</p>
@@ -446,7 +492,7 @@ export function MapScreen() {
 
   if (showSummary) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center bg-slate-100/80 dark:bg-[#050505]/80 backdrop-blur-md p-4 relative overflow-hidden animate-in fade-in duration-500 z-[2000]">
+      <div className="flex h-[100dvh] flex-col items-center justify-center bg-slate-100/80 dark:bg-[#050505]/80 backdrop-blur-md p-4 relative overflow-hidden animate-in fade-in duration-500 z-[2000]">
         {/* Ambient background glow */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-emerald-500/10 rounded-full blur-[100px] pointer-events-none mix-blend-screen" />
         
@@ -468,6 +514,13 @@ export function MapScreen() {
               </p>
             </div>
           </div>
+
+          {summaryData.streak > 0 && (
+            <div className="inline-flex items-center gap-2 rounded-full bg-amber-500/15 border border-amber-500/30 px-4 py-2 text-xs font-bold uppercase tracking-widest text-amber-600 dark:text-[#FFB800]">
+              <Flame className="h-4 w-4" />
+              <span>{summaryData.streak} Day Active Streak</span>
+            </div>
+          )}
 
           {newAchievements.length > 0 && (
             <div className="mb-8">
@@ -495,9 +548,9 @@ export function MapScreen() {
   }
 
   return (
-    <main aria-label="Game Screen" className="relative h-screen w-full bg-slate-100 dark:bg-[#050505] flex flex-col overflow-hidden">
+    <main aria-label="Game Screen" className="relative h-[100dvh] w-full bg-slate-100 dark:bg-[#050505] flex flex-col overflow-hidden">
       {/* Top Navigation Bar */}
-      <header aria-label="Status Bar" className="absolute top-0 left-0 right-0 z-[1000] flex items-center justify-between p-6 pointer-events-none">
+      <header aria-label="Status Bar" className="absolute top-0 left-0 right-0 z-[1000] flex items-center justify-between p-6 pt-[max(1.5rem,env(safe-area-inset-top))] pointer-events-none">
         <div role="status" aria-live="polite" className="pointer-events-auto flex items-center gap-3 glass-panel bg-white/90 dark:bg-black/40 px-5 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10">
           <div className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -508,45 +561,63 @@ export function MapScreen() {
           </span>
         </div>
 
-        {/* Dev Tools */ }
-        {!isRunning && !isPaused && authUser?.email === 'hemsai2004@gmail.com' && (
+        {/* Right Header Actions: Install App + Dev Tools */}
+        {!isRunning && !isPaused && (
           <div className="pointer-events-auto flex items-center gap-2">
-            <button
-              onClick={() => {
-                setForceTutorial(true);
-                setShowWelcome(true);
-              }}
-              aria-label="Show Tutorial"
-              className="flex items-center gap-2 glass-panel bg-white/90 dark:bg-black/40 px-4 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10 hover:bg-white dark:hover:bg-black/60 transition-colors"
-            >
-              <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 tracking-[0.2em] uppercase">
-                Tour
-              </span>
-            </button>
-            <button
-              onClick={simulateRun}
-              aria-label="Simulate GPS Run"
-              className="flex items-center gap-2 glass-panel bg-white/90 dark:bg-black/40 px-4 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10 hover:bg-white dark:hover:bg-black/60 transition-colors"
-            >
-              <Navigation aria-hidden="true" className="h-3.5 w-3.5 text-slate-700 dark:text-slate-200" />
-              <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 tracking-[0.2em] uppercase">
-                Simulate
-              </span>
-            </button>
+            <PWAInstallButton variant="compact" />
+            {authUser?.email === 'hemsai2004@gmail.com' && (
+              <>
+                <button
+                  onClick={() => {
+                    setForceTutorial(true);
+                    setShowWelcome(true);
+                  }}
+                  aria-label="Show Tutorial"
+                  className="flex items-center gap-2 glass-panel bg-white/90 dark:bg-black/40 px-4 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10 hover:bg-white dark:hover:bg-black/60 transition-colors"
+                >
+                  <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 tracking-[0.2em] uppercase">
+                    Tour
+                  </span>
+                </button>
+                <button
+                  onClick={simulateRun}
+                  aria-label="Simulate GPS Run"
+                  className="flex items-center gap-2 glass-panel bg-white/90 dark:bg-black/40 px-4 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10 hover:bg-white dark:hover:bg-black/60 transition-colors"
+                >
+                  <Navigation aria-hidden="true" className="h-3.5 w-3.5 text-slate-700 dark:text-slate-200" />
+                  <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 tracking-[0.2em] uppercase">
+                    Simulate
+                  </span>
+                </button>
+              </>
+            )}
           </div>
         )}
       </header>
 
-      {/* Error Banner */}
-      {error && (
+      {/* Error / Save Error Banner */}
+      {(error || saveError) && (
         <section role="alert" aria-live="assertive" className="absolute top-28 left-1/2 -translate-x-1/2 z-[1000] glass-panel bg-slate-100/80 dark:bg-[#050505]/80 border-red-500/20 px-6 py-5 rounded-[2rem] flex items-center gap-5 w-[90%] max-w-md shadow-[0_20px_40px_rgba(239,68,68,0.15)] backdrop-blur-xl">
           <div className="bg-red-500/10 p-3 rounded-2xl border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
             <AlertTriangle className="h-6 w-6 text-red-500 dark:text-red-400" />
           </div>
-          <div>
-            <h3 className="text-sm font-display font-bold text-red-600 dark:text-red-100 tracking-wide">GPS Signal Lost</h3>
-            <p className="text-xs text-red-500/80 dark:text-red-200/60 mt-1 font-medium tracking-wide">Please ensure location services are enabled.</p>
+          <div className="flex-1">
+            <h3 className="text-sm font-display font-bold text-red-600 dark:text-red-100 tracking-wide">
+              {saveError ? 'Save Failed' : 'GPS Signal Lost'}
+            </h3>
+            <p className="text-xs text-red-500/80 dark:text-red-200/60 mt-1 font-medium tracking-wide">
+              {saveError || 'Please ensure location services are enabled.'}
+            </p>
           </div>
+          {saveError && (
+            <button
+              onClick={() => setSaveError(null)}
+              aria-label="Dismiss save error"
+              className="p-1.5 rounded-full text-red-400 hover:bg-red-500/10"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          )}
         </section>
       )}
 
@@ -820,10 +891,10 @@ export function MapScreen() {
             pace={formatPace(distance, elapsedTime)}
             time={formatTime(elapsedTime)}
             area={Math.round(territoryArea).toLocaleString()}
-            onStart={startRun}
-            onPause={pauseRun}
-            onResume={resumeRun}
-            onStop={handleFinishRun}
+            onStart={() => { triggerHaptic(40); startRun(); }}
+            onPause={() => { triggerHaptic(20); pauseRun(); }}
+            onResume={() => { triggerHaptic(30); resumeRun(); }}
+            onStop={() => { triggerHaptic([30, 40]); handleFinishRun(); }}
           />
         </>
       )}
@@ -872,6 +943,9 @@ export function MapScreen() {
               totalRuns={userProfile.totalRuns || 0}
               territoryControlled={Number(userTerritoryStats.totalArea.toFixed(2))}
               avgStrength={userTerritoryStats.avgStrength}
+              currentStreak={userProfile.currentStreak}
+              longestStreak={userProfile.longestStreak}
+              lastRunDate={userProfile.lastRunDate}
               achievements={userProfile.achievements || []}
               color={userProfile.territoryColor}
             />
@@ -892,7 +966,8 @@ export function MapScreen() {
             </button>
           </div>
           <div className="w-full max-w-md space-y-6">
-            
+            <PWAInstallButton variant="card" />
+
             <ProfileSettings />
             
             <GeneralSettings />

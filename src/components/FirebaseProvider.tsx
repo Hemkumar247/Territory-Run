@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User as FirebaseAuthUser, onAuthStateChanged } from 'firebase/auth';
+import { User as FirebaseAuthUser, getRedirectResult, onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
 import { doc, getDocFromServer, onSnapshot } from 'firebase/firestore';
 import { User as CustomUser } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/errors';
+import { checkAndCreateUserProfile } from '../services/authService';
 
 interface FirebaseContextType {
   authUser: FirebaseAuthUser | null;
@@ -25,6 +26,17 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
+    // Handle mobile/Android PWA redirect sign-in results
+    getRedirectResult(auth)
+      .then((result) => {
+        if (result?.user) {
+          return checkAndCreateUserProfile(result.user);
+        }
+      })
+      .catch((error) => {
+        console.error('Redirect Sign-In Error:', error);
+      });
+
     // Test connection to Firestore
     const testConnection = async () => {
       try {

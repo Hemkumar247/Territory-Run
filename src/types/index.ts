@@ -20,6 +20,9 @@ export interface User {
     autoPause?: boolean;
   };
   achievements?: string[];
+  currentStreak?: number;
+  longestStreak?: number;
+  lastRunDate?: string; // YYYY-MM-DD in local calendar date
 }
 
 export interface Coordinate {

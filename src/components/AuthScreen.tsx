@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, ArrowRight, Loader2, Map } from 'lucide-react';
 import { signInWithGoogle, checkAndCreateUserProfile, authErrorMessage } from '../services/authService';
+import { capacitorGPS } from '../services/capacitorGPS';
 import { auth } from '../lib/firebase';
 import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
 import { PWAInstallButton } from './PWAInstallButton';
@@ -38,6 +39,8 @@ export function AuthScreen() {
         const result = await createUserWithEmailAndPassword(auth, cleanEmail, password);
         await checkAndCreateUserProfile(result.user, displayName);
       }
+      // Ask while the sign-in tap is still the current action, on both login and signup.
+      void capacitorGPS.requestPermissions();
     } catch (err) {
       console.error('Auth Error:', (err as { code?: string })?.code || err);
       setError(authErrorMessage(err));
@@ -53,6 +56,7 @@ export function AuthScreen() {
     setInfo(null);
     try {
       await signInWithGoogle();
+      void capacitorGPS.requestPermissions();
     } catch (err) {
       console.error('Google Auth Error:', (err as { code?: string })?.code || err);
       setError(authErrorMessage(err));

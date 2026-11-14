@@ -1,10 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, useMap, ZoomControl } from 'react-leaflet';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, Polygon, Circle, Tooltip, useMap, ZoomControl } from 'react-leaflet';
 import L from 'leaflet';
 import { useLocation } from '../hooks/useLocation';
 import { useFirebase } from './FirebaseProvider';
 import { useGlobalData } from '../hooks/useGlobalData';
-import { LogOut, Navigation, AlertTriangle, Loader2, Moon, Sun, X, CheckCircle2, Flame } from 'lucide-react';
+import { LogOut, Navigation, AlertTriangle, Loader2, Moon, Sun, X, CheckCircle2, Flame, LocateFixed } from 'lucide-react';
 import { logout } from '../services/authService';
 import { saveRunSession } from '../services/runService';
 import { getTacticalAdvice } from '../services/aiTactician';
@@ -34,6 +34,10 @@ import { Capacitor } from '@capacitor/core';
 import { LocationDisclosure, LOCATION_CONSENT_KEY } from './LocationDisclosure';
 import { A11yAudit } from './A11yAudit';
 import { trackEvent, AnalyticsEvents } from '../lib/analytics';
+import { useFriendLiveLocations } from '../hooks/useFriendLive';
+import { clearLiveLocation, publishLiveLocation } from '../services/liveLocationService';
+import { capacitorGPS } from '../services/capacitorGPS';
+import { locationGranted } from '../lib/locationAccess';
 
 // Fix for default Leaflet icon missing in Vite/Webpack
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -43,18 +47,38 @@ L.Icon.Default.mergeOptions({
   shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
 });
 
-// Component to recenter map when location updates during tracking
-function RecenterAutomatically({ lat, lng, isRunning }: { lat: number; lng: number, isRunning: boolean }) {
+// Keeps the camera on the runner until they drag the map, the same way a ride app follows the car.
+function FollowUser({ lat, lng, enabled, recenterTick }: { lat: number; lng: number; enabled: boolean; recenterTick: number }) {
   const map = useMap();
+  const sawFix = useRef(false);
+  const prev = useRef<{ lat: number; lng: number } | null>(null);
   useEffect(() => {
-    if (isRunning) {
-      map.setView([lat, lng], map.getZoom());
+    if (!enabled) return;
+    const last = prev.current;
+    // A cached fix can be from another place. Snap instead of panning across the map.
+    const jumped = !!last && (Math.abs(last.lat - lat) > 0.02 || Math.abs(last.lng - lng) > 0.02);
+    prev.current = { lat, lng };
+    if (!sawFix.current || jumped) {
+      map.setView([lat, lng], 17, { animate: sawFix.current && !jumped });
+      sawFix.current = true;
+      return;
     }
-  }, [lat, lng, map, isRunning]);
+    map.panTo([lat, lng], { animate: true, duration: 0.5 });
+  }, [lat, lng, enabled, map, recenterTick]);
   return null;
 }
 
-// Component to set initial bounds to include user territory and current location
+function StopFollowOnDrag({ onDrag }: { onDrag: () => void }) {
+  const map = useMap();
+  useEffect(() => {
+    map.on('dragstart', onDrag);
+    return () => {
+      map.off('dragstart', onDrag);
+    };
+  }, [map, onDrag]);
+  return null;
+}
+
 function FitMapToFrame() {
   const map = useMap();
   useEffect(() => {
@@ -69,20 +93,7 @@ function FitMapToFrame() {
   return null;
 }
 
-function InitialMapBounds({ currentLocation }: { currentLocation: any }) {
-  const map = useMap();
-  const [hasSetInitialBounds, setHasSetInitialBounds] = useState(false);
 
-  useEffect(() => {
-    if (!hasSetInitialBounds && currentLocation) {
-      // Always center on the user's exact current location with a close-up zoom
-      map.setView([currentLocation.lat, currentLocation.lng], 17);
-      setHasSetInitialBounds(true);
-    }
-  }, [currentLocation, map, hasSetInitialBounds]);
-
-  return null;
-}
 
 import { AchievementBadge } from './ui/AchievementBadge';
 import { User } from '../types';
@@ -116,7 +127,7 @@ function getTerritoryBadgeSVG(user: User | undefined): string {
 
 export function MapScreen() {
   const { userProfile, authUser } = useFirebase();
-  const { currentLocation, trail, error, isTracking, isRunning, isPaused, elapsedTime, startRun, pauseRun, resumeRun, endRun, resetRun, simulateRun } = useLocation();
+  const { currentLocation, accuracy, trail, error, isTracking, isRunning, isPaused, elapsedTime, permission, startRun, pauseRun, resumeRun, endRun, resetRun, simulateRun, requestPermission } = useLocation();
   const { territories, leaderboardUsers, loading } = useGlobalData();
   
   // Calculate user's total territory stats
@@ -152,9 +163,41 @@ export function MapScreen() {
   const [summaryData, setSummaryData] = useState({ distance: 0, area: 0, streak: 0 });
   const [activeNotification, setActiveNotification] = useState<AppNotification | null>(null);
   const [coachAdvice, setCoachAdvice] = useState<string | null>(null);
+  const [followUser, setFollowUser] = useState(true);
+  const [recenterTick, setRecenterTick] = useState(0);
+  const [locationPromptDismissed, setLocationPromptDismissed] = useState(false);
+  const stopFollow = useCallback(() => setFollowUser(false), []);
+  const friendIds = userProfile?.friends ?? [];
+  const friendLive = useFriendLiveLocations(friendIds);
 
   // Keep Android screen awake during active GPS runs
   useWakeLock(isRunning && !isPaused);
+
+  const wasRunningRef = useRef(false);
+  // Friends see this runner's live spot only while the run is recording.
+  useEffect(() => {
+    if (!authUser || !userProfile) return;
+    if (!isRunning) {
+      if (wasRunningRef.current) {
+        wasRunningRef.current = false;
+        clearLiveLocation(authUser.uid).catch(() => undefined);
+      }
+      return;
+    }
+    wasRunningRef.current = true;
+    if (!currentLocation || accuracy == null || accuracy <= 0 || accuracy > 50) return;
+    const handle = window.setTimeout(() => {
+      publishLiveLocation({
+        uid: authUser.uid,
+        lat: currentLocation.lat,
+        lng: currentLocation.lng,
+        accuracy,
+        displayName: userProfile.displayName || 'Runner',
+        territoryColor: userProfile.territoryColor || '#3B82F6',
+      }).catch(() => undefined);
+    }, 800);
+    return () => window.clearTimeout(handle);
+  }, [authUser, userProfile, isRunning, isPaused, currentLocation, accuracy]);
 
   const triggerHaptic = (pattern: number | number[] = 30) => {
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
@@ -309,39 +352,63 @@ export function MapScreen() {
     return hash;
   }, [territories]);
 
-  // Filter territories within roughly 5km radius using Spatial Hash (O(1) approach)
-  const visibleTerritories = useMemo(() => {
-    if (!currentLocation || loading) return [];
-    
-    // Use spatial hash to retrieve candidates instead of iterating globally
-    const candidateTerritories = spatialHash.queryRadius(
-      currentLocation.lat, 
-      currentLocation.lng, 
-      5.0 // 5km search radius
-    );
+  const friendIdSet = useMemo(() => new Set(friendIds), [friendIds]);
 
-    const userPt = turf.point([currentLocation.lng, currentLocation.lat]);
+  // Nearby territories, plus every territory that belongs to the player or a friend.
+  const visibleTerritories = useMemo(() => {
     const finalVisible = new Set<any>();
 
-    // Map through candidates to strictly filter distance
-    candidateTerritories.forEach(t => {
-      if (!t.coordinates || t.coordinates.length === 0) return;
-      const terrPt = turf.point([t.coordinates[0].lng, t.coordinates[0].lat]);
-      const dist = turf.distance(userPt, terrPt, { units: 'kilometers' });
-      if (dist <= 5) {
-        finalVisible.add(t);
-      }
-    });
+    if (currentLocation && !loading) {
+      const candidateTerritories = spatialHash.queryRadius(
+        currentLocation.lat,
+        currentLocation.lng,
+        5.0
+      );
+      const userPt = turf.point([currentLocation.lng, currentLocation.lat]);
+      candidateTerritories.forEach(t => {
+        if (!t.coordinates || t.coordinates.length === 0) return;
+        const terrPt = turf.point([t.coordinates[0].lng, t.coordinates[0].lat]);
+        const dist = turf.distance(userPt, terrPt, { units: 'kilometers' });
+        if (dist <= 5) finalVisible.add(t);
+      });
+    }
 
-    // Always ensure user's explicit territory is visible regardless
     if (authUser) {
-       territories.filter(t => t.uid === authUser.uid).forEach(ownTerritory => {
-         finalVisible.add(ownTerritory);
-       });
+      territories
+        .filter(t => t.uid === authUser.uid || friendIdSet.has(t.uid))
+        .forEach(territory => finalVisible.add(territory));
     }
 
     return Array.from(finalVisible);
-  }, [territories, currentLocation, loading, authUser, spatialHash]);
+  }, [territories, currentLocation, loading, authUser, spatialHash, friendIdSet]);
+
+  const friendSpots = useMemo(() => {
+    const spots = new Map<string, { uid: string; name: string; color: string; lat: number; lng: number; live: boolean }>();
+    territories.forEach(t => {
+      if (!friendIdSet.has(t.uid) || !t.coordinates?.length) return;
+      if (spots.has(t.uid)) return;
+      spots.set(t.uid, {
+        uid: t.uid,
+        name: t.user?.displayName || 'Friend',
+        color: t.user?.territoryColor || '#3b82f6',
+        lat: t.coordinates[0].lat,
+        lng: t.coordinates[0].lng,
+        live: false,
+      });
+    });
+    friendLive.forEach(live => {
+      const existing = spots.get(live.uid);
+      spots.set(live.uid, {
+        uid: live.uid,
+        name: live.displayName || existing?.name || 'Friend',
+        color: live.territoryColor || existing?.color || '#3b82f6',
+        lat: live.lat,
+        lng: live.lng,
+        live: true,
+      });
+    });
+    return Array.from(spots.values());
+  }, [territories, friendIdSet, friendLive]);
 
   // Calculate Contested Zones (Intersections)
   const contestedZones = useMemo(() => {
@@ -427,6 +494,22 @@ export function MapScreen() {
 
   const [newAchievements, setNewAchievements] = useState<string[]>([]);
   const [showLocationDisclosure, setShowLocationDisclosure] = useState(false);
+  const needsLocationPrompt = !locationGranted(permission) && permission !== 'checking' && !locationPromptDismissed;
+  const locationVariant = permission === 'disabled' ? 'services-off' : 'entry';
+  const allowLocation = async () => {
+    if (permission === 'disabled') {
+      await capacitorGPS.openSettings();
+      return;
+    }
+    const access = await requestPermission();
+    if (access === 'precise' || access === 'approximate') {
+      setLocationPromptDismissed(false);
+      setFollowUser(true);
+      setRecenterTick(tick => tick + 1);
+      return;
+    }
+    if (access === 'denied') await capacitorGPS.openSettings();
+  };
   const beginRun = () => { triggerHaptic(40); trackEvent(AnalyticsEvents.RUN_STARTED); startRun(); };
   const notifiedUsersRef = React.useRef<Set<string>>(new Set());
 
@@ -480,9 +563,10 @@ export function MapScreen() {
     if (!authUser || !userProfile) return;
     
     if (trail.length < 2) {
-      // Not enough data to save a run
+      // Not enough accurate movement to record a distance.
       endRun();
       resetRun();
+      clearLiveLocation(authUser.uid).catch(() => undefined);
       return;
     }
 
@@ -552,6 +636,7 @@ export function MapScreen() {
       }
       setSaveError(null);
       setShowSummary(true);
+      clearLiveLocation(authUser.uid).catch(() => undefined);
       resetRun();
     } catch (err) {
       console.error("Failed to save run:", err);
@@ -635,8 +720,16 @@ export function MapScreen() {
   return (
     <>
       <A11yAudit enabled={process.env.NODE_ENV === 'development'} />
+      {needsLocationPrompt && (
+        <LocationDisclosure
+          variant={locationVariant}
+          onCancel={() => setLocationPromptDismissed(true)}
+          onAccept={() => { void allowLocation(); }}
+        />
+      )}
       {showLocationDisclosure && (
         <LocationDisclosure
+          variant="run"
           onCancel={() => setShowLocationDisclosure(false)}
           onAccept={() => {
             localStorage.setItem(LOCATION_CONSENT_KEY, '1');
@@ -654,7 +747,7 @@ export function MapScreen() {
             <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
           </div>
           <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 tracking-[0.2em] uppercase">
-            {isTracking ? 'GPS Active' : 'Locating...'}
+            {isTracking ? (accuracy && accuracy <= 100 ? `GPS ${Math.round(accuracy)}m` : 'GPS Active') : 'Locating...'}
           </span>
         </div>
 
@@ -688,6 +781,16 @@ export function MapScreen() {
         )}
       </header>
 
+      {permission === 'approximate' && !error && !saveError && (
+        <button
+          type="button"
+          onClick={() => { void capacitorGPS.openSettings(); }}
+          className="absolute top-28 left-1/2 z-[1000] w-[90%] max-w-md -translate-x-1/2 rounded-2xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-left text-xs font-medium text-amber-800 dark:text-amber-200"
+        >
+          Precise location is off, so the map can be off by a city block. Tap to turn on Precise.
+        </button>
+      )}
+
       {/* Error / Save Error Banner */}
       {(error || saveError) && (
         <section role="alert" aria-live="assertive" className="absolute top-28 left-1/2 -translate-x-1/2 z-[1000] glass-panel bg-slate-100/80 dark:bg-[#050505]/80 border-red-500/20 px-6 py-5 rounded-[2rem] flex items-center gap-5 w-[90%] max-w-md shadow-[0_20px_40px_rgba(239,68,68,0.15)] backdrop-blur-xl">
@@ -696,11 +799,20 @@ export function MapScreen() {
           </div>
           <div className="flex-1">
             <h3 className="text-sm font-display font-bold text-red-600 dark:text-red-100 tracking-wide">
-              {saveError ? 'Save Failed' : 'GPS Signal Lost'}
+              {saveError ? 'Save Failed' : !locationGranted(permission) && permission !== 'checking' ? 'Location needed' : 'GPS Signal Lost'}
             </h3>
             <p className="text-xs text-red-500/80 dark:text-red-200/60 mt-1 font-medium tracking-wide">
-              {saveError || 'Location is off. The map stays visible. Allow location to center on you, or use Simulate.'}
+              {saveError || error || 'Allow location to center the map on you.'}
             </p>
+            {!saveError && !locationGranted(permission) && permission !== 'checking' && (
+              <button
+                type="button"
+                onClick={() => { setLocationPromptDismissed(false); void allowLocation(); }}
+                className="mt-2 text-xs font-bold uppercase tracking-wider text-teal-600 dark:text-teal-300"
+              >
+                Allow location
+              </button>
+            )}
           </div>
           {saveError && (
             <button
@@ -714,7 +826,7 @@ export function MapScreen() {
         </section>
       )}
 
-      {activeTab === 'map' && coachAdvice && !isRunning && !isPaused && !(error || saveError) && (
+      {activeTab === 'map' && coachAdvice && !isRunning && !isPaused && !(error || saveError) && friendSpots.length === 0 && (
         <div className="absolute top-24 left-4 right-4 z-[900] pointer-events-none">
           <div className="pointer-events-auto mx-auto max-w-md glass-panel bg-white/90 dark:bg-black/40 px-4 py-3 rounded-2xl border border-black/10 dark:border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.12)]">
             <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-700 dark:text-teal-300">Tactician</p>
@@ -735,25 +847,23 @@ export function MapScreen() {
       <section aria-label="Interactive Map Area" className="absolute inset-0 z-0">
           <MapContainer 
             ref={setMapInstance}
-            center={[currentLocation?.lat ?? 37.7749, currentLocation?.lng ?? -122.4194]} 
-            zoom={currentLocation ? 16 : 13}
+            center={[currentLocation?.lat ?? 20, currentLocation?.lng ?? 0]} 
+            zoom={currentLocation ? 17 : 2}
             maxZoom={19}
             className={`territory-map h-full w-full ${isDarkMode ? 'territory-map-dark bg-[#0e1116]' : 'bg-slate-100'}`}
             zoomControl={false}
           >
             <ZoomControl position="bottomleft" />
             <FitMapToFrame />
+            <StopFollowOnDrag onDrag={stopFollow} />
             <TileLayer
               attribution={MAP_TILE_ATTRIBUTION}
               url={MAP_TILE_URL}
               maxZoom={19}
             />
             
-            <InitialMapBounds 
-              currentLocation={currentLocation} 
-            />
             {currentLocation && (
-              <RecenterAutomatically lat={currentLocation.lat} lng={currentLocation.lng} isRunning={isRunning} />
+              <FollowUser lat={currentLocation.lat} lng={currentLocation.lng} enabled={followUser} recenterTick={recenterTick} />
             )}
             
             {/* Render all saved territories from the database */}
@@ -909,6 +1019,18 @@ export function MapScreen() {
             )}
 
             {/* User's current location marker */}
+            {currentLocation && accuracy != null && accuracy > 0 && accuracy <= 100 && (
+              <Circle
+                center={[currentLocation.lat, currentLocation.lng]}
+                radius={accuracy}
+                pathOptions={{
+                  color: userProfile?.territoryColor || '#3b82f6',
+                  weight: 1,
+                  fillColor: userProfile?.territoryColor || '#3b82f6',
+                  fillOpacity: 0.12,
+                }}
+              />
+            )}
             {currentLocation && <Marker 
               position={[currentLocation.lat, currentLocation.lng]}
               icon={createPulsingIcon(userProfile?.territoryColor || '#3b82f6')}
@@ -916,10 +1038,30 @@ export function MapScreen() {
               <Popup>
                 <div className="text-center">
                   <p className="font-bold text-slate-900">{userProfile?.displayName || 'You'}</p>
-                  <p className="text-xs text-slate-600">Current Location</p>
+                  <p className="text-xs text-slate-600">
+                    {accuracy && accuracy <= 100 ? `Accurate to ${Math.round(accuracy)} m` : 'Current location'}
+                  </p>
                 </div>
               </Popup>
             </Marker>}
+
+            {friendLive.map(friend => (
+              <Marker
+                key={`live-${friend.uid}`}
+                position={[friend.lat, friend.lng]}
+                icon={createPulsingIcon(friend.territoryColor || '#f59e0b')}
+              >
+                <Tooltip permanent direction="top" offset={[0, -8]} className="friend-live-tip">
+                  {friend.displayName} · running
+                </Tooltip>
+                <Popup>
+                  <div className="text-center">
+                    <p className="font-bold text-slate-900">{friend.displayName}</p>
+                    <p className="text-xs text-slate-600">Live run · {Math.round(friend.accuracy)} m</p>
+                  </div>
+                </Popup>
+              </Marker>
+            ))}
 
             {/* User's trail */}
             {polylinePositions.length > 1 && (
@@ -935,6 +1077,39 @@ export function MapScreen() {
             )}
           </MapContainer>
       </section>
+
+      {activeTab === 'map' && friendSpots.length > 0 && !isRunning && !isPaused && (
+        <div className="absolute top-[5.5rem] left-0 right-0 z-[900] flex gap-2 overflow-x-auto px-4 pb-1 pointer-events-auto">
+          {friendSpots.map(friend => (
+            <button
+              key={friend.uid}
+              type="button"
+              onClick={() => {
+                setFollowUser(false);
+                mapInstance?.flyTo([friend.lat, friend.lng], 16, { animate: true, duration: 0.8 });
+              }}
+              className="shrink-0 rounded-full border border-black/10 bg-white/90 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-700 shadow dark:border-white/10 dark:bg-black/60 dark:text-slate-100"
+            >
+              <span className="mr-1 inline-block h-2 w-2 rounded-full" style={{ backgroundColor: friend.color }} />
+              {friend.live ? `${friend.name} is running` : friend.name}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {activeTab === 'map' && currentLocation && (
+        <button
+          type="button"
+          aria-label="Center on my location"
+          onClick={() => {
+            setFollowUser(true);
+            setRecenterTick(tick => tick + 1);
+          }}
+          className="absolute top-1/2 right-4 z-[1000] flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-black/10 bg-white/95 text-slate-800 shadow-lg dark:border-white/10 dark:bg-black/70 dark:text-white"
+        >
+          <LocateFixed className="h-5 w-5" style={{ color: followUser ? (userProfile?.territoryColor || '#14b8a6') : undefined }} />
+        </button>
+      )}
 
       {/* Bottom HUD & Navigation */}
       {activeTab === 'map' && (
@@ -962,11 +1137,17 @@ export function MapScreen() {
             time={formatTime(elapsedTime)}
             area={Math.round(territoryArea).toLocaleString()}
             onStart={() => {
+              if (!locationGranted(permission)) {
+                setLocationPromptDismissed(false);
+                void allowLocation();
+                return;
+              }
               // Native app: show the location disclosure once before the first run (Play policy).
               if (Capacitor.isNativePlatform() && localStorage.getItem(LOCATION_CONSENT_KEY) !== '1') {
                 setShowLocationDisclosure(true);
                 return;
               }
+              setFollowUser(true);
               beginRun();
             }}
             onPause={() => { triggerHaptic(20); trackEvent(AnalyticsEvents.RUN_PAUSED, { distance_km: distance }); pauseRun(); }}

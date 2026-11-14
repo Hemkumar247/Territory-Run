@@ -4,4 +4,7 @@
     <string name="title_activity_main">Territory Run</string>
     <string name="package_name">com.territoryrun.app</string>
     <string name="custom_url_scheme">com.territoryrun.app</string>
+    <string name="capacitor_background_geolocation_notification_icon">drawable/ic_stat_run</string>
+    <string name="capacitor_background_geolocation_notification_channel_name">Run tracking</string>
+    <string name="capacitor_background_geolocation_notification_color">#00E5FF</string>
 </resources>

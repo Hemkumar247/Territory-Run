@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "clean": "rm -rf dist",
-    "lint": "eslint . && tsc --noEmit"
+    "lint": "eslint . && tsc --noEmit",
+    "postinstall": "node scripts/patch-android-location.mjs"
   },
   "dependencies": {
     "@capacitor-community/background-geolocation": "^1.3.1",

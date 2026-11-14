@@ -1,7 +1,8 @@
-import { registerPlugin } from '@capacitor/core';
-import { Geolocation, Position, PositionOptions, GeolocationOptions } from '@capacitor/geolocation';
+import { Capacitor, registerPlugin } from '@capacitor/core';
+import { Geolocation, Position, PositionOptions } from '@capacitor/geolocation';
 import { App } from '@capacitor/app';
 import type { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
+import { LocationAccess, toLocationAccess } from '../lib/locationAccess';
 
 // Android foreground service (type=location). Keeps GPS flowing while the screen is off or the app is in the background.
 const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
@@ -33,6 +34,7 @@ class CapacitorGPS {
   private bgStopRequested = false;
   private locationCallback: LocationCallback | null = null;
   private errorCallback: ErrorCallback | null = null;
+  private permissionInflight: Promise<LocationAccess> | null = null;
   private config: GPSConfig = {
     enableHighAccuracy: true,
     timeout: 10000,
@@ -40,12 +42,53 @@ class CapacitorGPS {
     distanceFilter: 5,
   };
 
-  async requestPermissions(): Promise<boolean> {
+  /**
+   * Shows the system location dialog. Safe to call from login, signup, and the map:
+   * overlapping calls share one prompt. On the web this triggers the browser prompt,
+   * because Capacitor's requestPermissions is native-only.
+   */
+  requestPermissions(): Promise<LocationAccess> {
+    if (!this.permissionInflight) {
+      this.permissionInflight = this.requestPermissionsOnce().finally(() => {
+        this.permissionInflight = null;
+      });
+    }
+    return this.permissionInflight;
+  }
+
+  private async requestPermissionsOnce(): Promise<LocationAccess> {
+    if (!Capacitor.isNativePlatform()) {
+      if (typeof navigator === 'undefined' || !navigator.geolocation) return 'denied';
+      return new Promise((resolve) => {
+        navigator.geolocation.getCurrentPosition(
+          () => resolve('precise'),
+          (err) => resolve(err.code === err.PERMISSION_DENIED ? 'denied' : 'disabled'),
+          { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+        );
+      });
+    }
+
     try {
-      const perm = await Geolocation.requestPermissions();
-      return perm.location === 'granted';
-    } catch {
-      return false;
+      const perm = await Geolocation.requestPermissions({ permissions: ['location'] });
+      return toLocationAccess(perm);
+    } catch (error) {
+      try {
+        const perm = await Geolocation.checkPermissions();
+        const access = toLocationAccess(perm);
+        if (access === 'precise' || access === 'approximate') return access;
+      } catch {
+        // checkPermissions throws when device location is switched off.
+      }
+      return toLocationAccess(undefined, error);
+    }
+  }
+
+  async checkAccess(): Promise<LocationAccess> {
+    try {
+      const perm = await Geolocation.checkPermissions();
+      return toLocationAccess(perm);
+    } catch (error) {
+      return toLocationAccess(undefined, error);
     }
   }
 
@@ -62,7 +105,7 @@ class CapacitorGPS {
   async startWatching(
     callback: LocationCallback,
     errorCallback?: ErrorCallback,
-    options?: Partial<GeolocationOptions>
+    options?: Partial<PositionOptions>
   ): Promise<void> {
     this.locationCallback = callback;
     this.errorCallback = errorCallback;
@@ -113,13 +156,15 @@ class CapacitorGPS {
     this.bgStarting = true;
     this.bgStopRequested = false;
     try {
+      await this.ensureRunNotificationPermission();
       const id = await BackgroundGeolocation.addWatcher(
         {
           backgroundTitle: 'Territory Run',
           backgroundMessage: 'Recording your run',
           requestPermissions: true,
           stale: false,
-          distanceFilter: this.config.distanceFilter,
+          // 0 = every GPS fix. The run filter drops jitter; a distance filter would cut corners.
+          distanceFilter: 0,
         },
         (location, error) => {
           if (error) {
@@ -160,6 +205,17 @@ class CapacitorGPS {
   /** Opens the app's system settings (e.g. for the user to re-enable location or exempt it from battery limits). */
   openSettings(): Promise<void> {
     return BackgroundGeolocation.openSettings().catch(() => undefined);
+  }
+
+  /** Android 13+ will not keep a location foreground service alive without notification permission. */
+  private async ensureRunNotificationPermission(): Promise<void> {
+    if (!Capacitor.isNativePlatform()) return;
+    try {
+      const { LocalNotifications } = await import('@capacitor/local-notifications');
+      await LocalNotifications.requestPermissions();
+    } catch {
+      // The run still starts. Tracking with the screen off needs this permission on Android 13+.
+    }
   }
 
   setConfig(config: Partial<GPSConfig>): void {

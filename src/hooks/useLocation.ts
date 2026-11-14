@@ -80,6 +80,7 @@ export function useLocation(): LocationState {
             return {
               ...prev,
               currentLocation: newCoord,
+              isTracking: true,
               error: null,
             };
           }
@@ -91,7 +92,7 @@ export function useLocation(): LocationState {
             const distance = turf.distance(from, to, { units: 'kilometers' });
             
             if (distance < 0.003 || location.accuracy > 50) {
-              return { ...prev, currentLocation: newCoord, error: null };
+              return { ...prev, currentLocation: newCoord, isTracking: true, error: null };
             }
           }
           
@@ -100,6 +101,7 @@ export function useLocation(): LocationState {
             ...prev,
             currentLocation: newCoord,
             trail: [...prev.trail, newTrailPoint],
+            isTracking: true,
             error: null,
           };
         });
@@ -204,8 +206,8 @@ export function useLocation(): LocationState {
 
     return () => {
       if (isNative) {
-        capacitorGPS.stopWatching();
-        capacitorGPS.stopBackgroundTracking();
+        capacitorGPS.stopWatching().catch(() => undefined);
+        capacitorGPS.stopBackgroundTracking().catch(() => undefined);
         if (backgroundListenerRef.current) {
           backgroundListenerRef.current();
         }

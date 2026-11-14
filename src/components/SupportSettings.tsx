@@ -26,7 +26,7 @@ export function SupportSettings() {
           <ExternalLink className="h-4 w-4 text-slate-400" />
         </button>
 
-        <a href="/terms-of-service.html" target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+        <a href="https://territory-run-drab.vercel.app/terms-of-service.html" target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
           <div className="flex items-center gap-3">
             <FileText className="h-5 w-5 text-slate-500" />
             <span className="font-medium text-slate-800 dark:text-slate-200">Terms of Service</span>
@@ -34,7 +34,7 @@ export function SupportSettings() {
           <ExternalLink className="h-4 w-4 text-slate-400" />
         </a>
 
-        <a href="/privacy-policy.html" target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
+        <a href="https://territory-run-drab.vercel.app/privacy-policy.html" target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
           <div className="flex items-center gap-3">
             <ShieldCheck className="h-5 w-5 text-slate-500" />
             <span className="font-medium text-slate-800 dark:text-slate-200">Privacy Policy</span>

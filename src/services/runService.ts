@@ -1,5 +1,5 @@
 import { db } from '../lib/firebase';
-import { collection, doc, setDoc, updateDoc, increment, serverTimestamp, getDocs, query, where, arrayUnion } from 'firebase/firestore';
+import { collection, doc, getDoc, setDoc, updateDoc, increment, serverTimestamp, getDocs, query, where, arrayUnion } from 'firebase/firestore';
 import * as turf from '@turf/turf';
 import { Coordinate, Session, Territory, User } from '../types';
 import { checkAchievements } from '../lib/achievements';
@@ -180,8 +180,11 @@ export async function saveRunSession(
 
 export async function syncPendingRuns(userId: string): Promise<{ synced: number; failed: number }> {
   return syncQueuedRuns(userId, async (data) => {
+    // Use the real profile: streak and achievements are computed from it.
+    const snap = await getDoc(doc(db, 'users', userId));
+    const profile = snap.exists() ? ({ ...snap.data(), uid: userId } as User) : ({ uid: userId } as User);
     await performSaveRunSession(
-      { uid: userId } as User,
+      profile,
       data.trail,
       data.distanceMeters,
       data.territoryPolygon as [number, number][],

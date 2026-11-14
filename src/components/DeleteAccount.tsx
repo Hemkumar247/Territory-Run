@@ -1,4 +1,7 @@
 import React, { useState } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Directory, Encoding, Filesystem } from '@capacitor/filesystem';
+import { Share } from '@capacitor/share';
 import { AlertTriangle, Trash2, Download, X, CheckCircle2 } from 'lucide-react';
 import { deleteAccount, exportUserData } from '../services/accountService';
 import { useFirebase } from './FirebaseProvider';
@@ -56,15 +59,27 @@ export function DeleteAccount({ onClose, onDeleted }: DeleteAccountProps) {
     }
   };
 
-  const downloadExport = () => {
+  const downloadExport = async () => {
     if (!exportData) return;
+    const fileName = `territory-run-export-${new Date().toISOString().split('T')[0]}.json`;
+    // Android WebView ignores blob downloads: write a file and hand it to the share sheet instead.
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { uri } = await Filesystem.writeFile({ path: fileName, data: exportData, directory: Directory.Cache, encoding: Encoding.UTF8 });
+        await Share.share({ title: 'Territory Run data export', url: uri });
+      } catch (err) {
+        console.error('Export share failed:', err);
+        setError('Could not export your data. Please try again.');
+      }
+      return;
+    }
     const blob = new Blob([exportData], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `territory-run-export-${new Date().toISOString().split('T')[0]}.json`;
+    a.download = fileName;
     a.click();
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   };
 
   if (step === 'export') {

@@ -80,9 +80,13 @@ export function SocialScreen({ onClose }: { onClose: () => void }) {
 
   const handleCopyCode = () => {
     if (userProfile?.friendCode) {
-      navigator.clipboard.writeText(userProfile.friendCode);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      navigator.clipboard
+        .writeText(userProfile.friendCode)
+        .then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        })
+        .catch(() => undefined);
     }
   };
 

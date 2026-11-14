@@ -1,7 +1,6 @@
 import { Geolocation, Position, PositionOptions, GeolocationOptions } from '@capacitor/geolocation';
 import { App } from '@capacitor/app';
 import { Device } from '@capacitor/device';
-import { Network } from '@capacitor/network';
 
 export interface GPSConfig {
   enableHighAccuracy: boolean;
@@ -91,7 +90,7 @@ class CapacitorGPS {
 
   async stopWatching(): Promise<void> {
     if (this.watchId) {
-      await Geolocation.clearWatch({ id: this.watchId });
+      await Geolocation.clearWatch({ id: this.watchId }).catch(() => undefined);
       this.watchId = null;
     }
     this.locationCallback = null;
@@ -145,10 +144,8 @@ class CapacitorGPS {
 
   async isLocationEnabled(): Promise<boolean> {
     try {
-      const network = await Network.getStatus();
-      if (!network.connected) return false;
-      const pos = await Geolocation.getCurrentPosition({ timeout: 5000, maximumAge: 10000 });
-      return !!pos.coords.latitude;
+      const perm = await Geolocation.checkPermissions();
+      return perm.location === 'granted' || perm.coarseLocation === 'granted';
     } catch {
       return false;
     }

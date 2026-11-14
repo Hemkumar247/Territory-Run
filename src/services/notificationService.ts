@@ -1,5 +1,7 @@
 import { collection, doc, onSnapshot, query, setDoc, updateDoc, where, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { Capacitor } from '@capacitor/core';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 export interface AppNotification {
   id: string;
@@ -12,6 +14,10 @@ export interface AppNotification {
 }
 
 export const requestNotificationPermission = async () => {
+  if (Capacitor.isNativePlatform()) {
+    const { display } = await LocalNotifications.requestPermissions();
+    return display === 'granted';
+  }
   if (!('Notification' in window)) {
     console.log('This browser does not support desktop notification');
     return false;
@@ -30,6 +36,17 @@ export const requestNotificationPermission = async () => {
 };
 
 export const showBrowserNotification = async (title: string, options?: NotificationOptions) => {
+  // Android WebView has no Notification API, so use the native local notification instead.
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await LocalNotifications.schedule({
+        notifications: [{ id: Math.floor(Math.random() * 2_000_000_000), title, body: options?.body ?? '' }],
+      });
+    } catch (error) {
+      console.error('Local notification failed:', error);
+    }
+    return;
+  }
   if (!('Notification' in window) || Notification.permission !== 'granted') return;
 
   const notificationOptions: NotificationOptions = {

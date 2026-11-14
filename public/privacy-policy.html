@@ -50,7 +50,7 @@
 
     <h2>4. Location Data</h2>
     <ul>
-        <li>Collected <strong>only during active runs</strong> you explicitly start</li>
+        <li>Precise location is used while the app is open (to show you on the map) and during runs you explicitly start. During a run it keeps being collected <strong>when the screen is off or the app is in the background</strong>, with a visible notification, and stops when you tap Stop. We never collect location when no run is active and the app is closed.</li>
         <li>Stored securely in Firebase Firestore</li>
         <li>Used to calculate territory polygons (convex hull of your trail)</li>
         <li>Shared with nearby players only as territory boundaries, not raw GPS points</li>

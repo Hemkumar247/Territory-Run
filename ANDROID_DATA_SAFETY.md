@@ -31,7 +31,7 @@
 ### Location Data (GPS)
 - **Collected:** Latitude, longitude, accuracy, altitude, speed, heading, timestamp
 - **When:** Only during explicitly started runs (user taps "Start Run")
-- **Background:** Optional background tracking for continuous runs (requires explicit permission)
+- **Background:** While a run is active, collection continues with the screen off via a visible foreground-service notification (type "location"). No "Allow all the time" permission is requested; nothing is collected when no run is active and the app is closed.
 - **Shared:** Territory boundaries (polygons) with nearby players, NOT raw GPS coordinates
 - **Retention:** While account exists; deleted within 30 days of account deletion
 - **User Control:** Can disable in device settings; delete via account deletion

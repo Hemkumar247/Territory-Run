@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Coordinate } from '../types';
 import * as turf from '@turf/turf';
-import { capacitorGPS, GPSConfig, LocationUpdate } from '../services/capacitorGPS';
+import { capacitorGPS, LocationUpdate } from '../services/capacitorGPS';
 
 interface LocationState {
   currentLocation: Coordinate | null;
@@ -42,12 +42,15 @@ export function useLocation(): LocationState {
   const isSimulatingRef = useRef(false);
   const simulationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const backgroundListenerRef = useRef<(() => void) | null>(null);
+  const processUpdateRef = useRef<((location: LocationUpdate) => void) | null>(null);
+  // Wall-clock based timer: setInterval is throttled/paused while the screen is off, so never count ticks.
+  const clockRef = useRef({ pausedMs: 0, pausedAt: 0 });
 
   useEffect(() => {
     if (state.isRunning && !state.isPaused) {
       timerIntervalRef.current = setInterval(() => {
-        setState(s => ({ ...s, elapsedTime: s.elapsedTime + 1 }));
+        const { pausedMs } = clockRef.current;
+        setState(s => (s.startTime ? { ...s, elapsedTime: Math.max(0, Math.floor((Date.now() - s.startTime - pausedMs) / 1000)) } : s));
       }, 1000);
     } else if (timerIntervalRef.current) {
       clearInterval(timerIntervalRef.current);
@@ -122,15 +125,8 @@ export function useLocation(): LocationState {
           distanceFilter: 5,
         });
 
+        processUpdateRef.current = processLocationUpdate;
         await capacitorGPS.startWatching(processLocationUpdate, handleError);
-        
-        backgroundListenerRef.current = capacitorGPS.addAppStateListener((state) => {
-          if (state === 'background' && isRunningRef.current && !isPausedRef.current) {
-            capacitorGPS.startBackgroundTracking();
-          } else if (state === 'active') {
-            capacitorGPS.stopBackgroundTracking();
-          }
-        });
 
         const locationEnabled = await capacitorGPS.isLocationEnabled();
         if (!locationEnabled) {
@@ -208,9 +204,6 @@ export function useLocation(): LocationState {
       if (isNative) {
         capacitorGPS.stopWatching().catch(() => undefined);
         capacitorGPS.stopBackgroundTracking().catch(() => undefined);
-        if (backgroundListenerRef.current) {
-          backgroundListenerRef.current();
-        }
       }
       if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
     };
@@ -221,7 +214,14 @@ export function useLocation(): LocationState {
     isPausedRef.current = false;
     isSimulatingRef.current = false;
     if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
-    
+    clockRef.current = { pausedMs: 0, pausedAt: 0 };
+    // Native: start the foreground service now, while the app is visible, so GPS survives screen-off.
+    if (isNative) {
+      capacitorGPS.startBackgroundTracking((loc) => processUpdateRef.current?.(loc), (err) =>
+        setState(s => ({ ...s, error: err.message }))
+      );
+    }
+
     setState(s => ({ 
       ...s, 
       isRunning: true, 
@@ -234,11 +234,14 @@ export function useLocation(): LocationState {
 
   const pauseRun = useCallback(() => {
     isPausedRef.current = true;
+    clockRef.current.pausedAt = Date.now();
     setState(s => ({ ...s, isPaused: true }));
   }, []);
 
   const resumeRun = useCallback(() => {
     isPausedRef.current = false;
+    if (clockRef.current.pausedAt) clockRef.current.pausedMs += Date.now() - clockRef.current.pausedAt;
+    clockRef.current.pausedAt = 0;
     setState(s => ({ ...s, isPaused: false }));
   }, []);
 
@@ -253,6 +256,7 @@ export function useLocation(): LocationState {
       isSimulatingRef.current = true;
       isRunningRef.current = true;
       isPausedRef.current = false;
+      clockRef.current = { pausedMs: 0, pausedAt: 0 };
       
       let currentLat = startLocation.lat;
       let currentLng = startLocation.lng;
@@ -307,6 +311,7 @@ export function useLocation(): LocationState {
   }, []);
 
   const endRun = useCallback(() => {
+    capacitorGPS.stopBackgroundTracking().catch(() => undefined);
     isRunningRef.current = false;
     isPausedRef.current = false;
     isSimulatingRef.current = false;
@@ -326,10 +331,12 @@ export function useLocation(): LocationState {
   }, []);
 
   const resetRun = useCallback(() => {
+    capacitorGPS.stopBackgroundTracking().catch(() => undefined);
     isRunningRef.current = false;
     isPausedRef.current = false;
     isSimulatingRef.current = false;
     if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
+    clockRef.current = { pausedMs: 0, pausedAt: 0 };
     setState(s => ({ ...s, trail: [], isRunning: false, isPaused: false, startTime: null, elapsedTime: 0, totalDistanceCovered: 0 }));
   }, []);
 

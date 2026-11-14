@@ -30,6 +30,8 @@ import { RunHistory } from './RunHistory';
 import { SocialScreen } from './SocialScreen';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { PWAInstallButton } from './PWAInstallButton';
+import { Capacitor } from '@capacitor/core';
+import { LocationDisclosure, LOCATION_CONSENT_KEY } from './LocationDisclosure';
 import { A11yAudit } from './A11yAudit';
 import { trackEvent, AnalyticsEvents } from '../lib/analytics';
 
@@ -424,6 +426,8 @@ export function MapScreen() {
   };
 
   const [newAchievements, setNewAchievements] = useState<string[]>([]);
+  const [showLocationDisclosure, setShowLocationDisclosure] = useState(false);
+  const beginRun = () => { triggerHaptic(40); trackEvent(AnalyticsEvents.RUN_STARTED); startRun(); };
   const notifiedUsersRef = React.useRef<Set<string>>(new Set());
 
   // Reset notified users when starting a new run
@@ -631,6 +635,16 @@ export function MapScreen() {
   return (
     <>
       <A11yAudit enabled={process.env.NODE_ENV === 'development'} />
+      {showLocationDisclosure && (
+        <LocationDisclosure
+          onCancel={() => setShowLocationDisclosure(false)}
+          onAccept={() => {
+            localStorage.setItem(LOCATION_CONSENT_KEY, '1');
+            setShowLocationDisclosure(false);
+            beginRun();
+          }}
+        />
+      )}
       <main aria-label="Game Screen" className="relative h-[100dvh] w-full bg-slate-100 dark:bg-[#050505] flex flex-col overflow-hidden">
         {/* Top Navigation Bar */}
       <header aria-label="Status Bar" className="absolute top-0 left-0 right-0 z-[1000] flex items-center justify-between p-6 pt-[max(1.5rem,env(safe-area-inset-top))] pointer-events-none">
@@ -947,7 +961,14 @@ export function MapScreen() {
             pace={formatPace(distance, elapsedTime)}
             time={formatTime(elapsedTime)}
             area={Math.round(territoryArea).toLocaleString()}
-            onStart={() => { triggerHaptic(40); trackEvent(AnalyticsEvents.RUN_STARTED); startRun(); }}
+            onStart={() => {
+              // Native app: show the location disclosure once before the first run (Play policy).
+              if (Capacitor.isNativePlatform() && localStorage.getItem(LOCATION_CONSENT_KEY) !== '1') {
+                setShowLocationDisclosure(true);
+                return;
+              }
+              beginRun();
+            }}
             onPause={() => { triggerHaptic(20); trackEvent(AnalyticsEvents.RUN_PAUSED, { distance_km: distance }); pauseRun(); }}
             onResume={() => { triggerHaptic(30); trackEvent(AnalyticsEvents.RUN_RESUMED, { distance_km: distance }); resumeRun(); }}
             onStop={() => { triggerHaptic([30, 40]); handleFinishRun(); }}

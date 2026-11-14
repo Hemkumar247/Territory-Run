@@ -1,6 +1,10 @@
+import { registerPlugin } from '@capacitor/core';
 import { Geolocation, Position, PositionOptions, GeolocationOptions } from '@capacitor/geolocation';
 import { App } from '@capacitor/app';
-import { Device } from '@capacitor/device';
+import type { BackgroundGeolocationPlugin } from '@capacitor-community/background-geolocation';
+
+// Android foreground service (type=location). Keeps GPS flowing while the screen is off or the app is in the background.
+const BackgroundGeolocation = registerPlugin<BackgroundGeolocationPlugin>('BackgroundGeolocation');
 
 export interface GPSConfig {
   enableHighAccuracy: boolean;
@@ -24,7 +28,9 @@ type ErrorCallback = (error: Error) => void;
 
 class CapacitorGPS {
   private watchId: string | null = null;
-  private backgroundEnabled = false;
+  private bgWatcherId: string | null = null;
+  private bgStarting = false;
+  private bgStopRequested = false;
   private locationCallback: LocationCallback | null = null;
   private errorCallback: ErrorCallback | null = null;
   private config: GPSConfig = {
@@ -97,32 +103,63 @@ class CapacitorGPS {
     this.errorCallback = null;
   }
 
-  async enableBackgroundMode(): Promise<boolean> {
-    if (this.backgroundEnabled) return true;
-
+  /**
+   * Starts the foreground service for an active run. MUST be called while the app is visible
+   * (e.g. from the Start button): Android only allows starting a location foreground service from the foreground.
+   * The service shows a persistent notification for as long as the run lasts.
+   */
+  async startBackgroundTracking(callback: LocationCallback, errorCallback?: ErrorCallback): Promise<void> {
+    if (this.bgStarting || this.bgWatcherId) return;
+    this.bgStarting = true;
+    this.bgStopRequested = false;
     try {
-      const info = await Device.getInfo();
-      const isMobile = info.platform === 'ios' || info.platform === 'android';
-      if (!isMobile) return false;
-
-      this.backgroundEnabled = true;
-      return true;
-    } catch {
-      return false;
+      const id = await BackgroundGeolocation.addWatcher(
+        {
+          backgroundTitle: 'Territory Run',
+          backgroundMessage: 'Recording your run',
+          requestPermissions: true,
+          stale: false,
+          distanceFilter: this.config.distanceFilter,
+        },
+        (location, error) => {
+          if (error) {
+            errorCallback?.(new Error(error.code === 'NOT_AUTHORIZED' ? 'Location permission denied. Please enable GPS in settings.' : error.message));
+            return;
+          }
+          if (location) {
+            callback({
+              latitude: location.latitude,
+              longitude: location.longitude,
+              accuracy: location.accuracy,
+              altitude: location.altitude,
+              speed: location.speed,
+              heading: location.bearing,
+              timestamp: location.time ?? Date.now(),
+            });
+          }
+        }
+      );
+      this.bgWatcherId = id;
+    } catch (error) {
+      errorCallback?.(error as Error);
+    } finally {
+      this.bgStarting = false;
     }
-  }
-
-  async startBackgroundTracking(): Promise<void> {
-    if (!this.backgroundEnabled) {
-      await this.enableBackgroundMode();
-    }
+    // The run ended while the service was still starting.
+    if (this.bgStopRequested) await this.stopBackgroundTracking();
   }
 
   async stopBackgroundTracking(): Promise<void> {
+    this.bgStopRequested = true;
+    if (!this.bgWatcherId) return;
+    const id = this.bgWatcherId;
+    this.bgWatcherId = null;
+    await BackgroundGeolocation.removeWatcher({ id }).catch(() => undefined);
   }
 
-  isBackgroundEnabled(): boolean {
-    return this.backgroundEnabled;
+  /** Opens the app's system settings (e.g. for the user to re-enable location or exempt it from battery limits). */
+  openSettings(): Promise<void> {
+    return BackgroundGeolocation.openSettings().catch(() => undefined);
   }
 
   setConfig(config: Partial<GPSConfig>): void {

@@ -38,7 +38,7 @@
 - **User-Generated Content:** Yes (display names, territory boundaries)
 - **Unrestricted Web Access:** No
 - **Social Features:** Yes (leaderboards, territory contests)
-- **Location Access:** Yes (precise, when-in-use + background optional)
+- **Location Access:** Yes (precise, while-in-use; continues during an active run through a foreground service, no ACCESS_BACKGROUND_LOCATION)
 
 **Result:** 4+ (No objectionable content)
 
@@ -76,7 +76,7 @@ No GPS spoofing, no bots. Pure effort = pure territory. Works offline - syncs wh
 
 ⚡ FEATURES
 • Real-time GPS tracking with offline support
-• Background location for long runs
+• Keeps tracking with the screen off during a run (visible notification)
 • Push notifications for territory contests
 • Haptic feedback for run milestones
 • Dark/light mode, custom territory colors
@@ -132,7 +132,6 @@ https://territoryrun.app/privacy-policy.html
 ```xml
 <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-<uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
 <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />

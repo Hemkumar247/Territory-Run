@@ -1,8 +1,8 @@
 import { auth } from '../lib/firebase';
 import { db } from '../lib/firebase';
 import { deleteUser, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
-import { doc, deleteDoc, collection, getDocs, writeBatch, query, where } from 'firebase/firestore';
-import { deleteApp } from 'firebase/app';
+import { clearLocalCache, reauthenticateWithGoogle } from './authService';
+import { doc, getDoc, collection, getDocs, writeBatch, query, where } from 'firebase/firestore';
 
 export interface DeleteAccountResult {
   success: boolean;
@@ -16,10 +16,14 @@ export async function deleteAccount(password?: string): Promise<DeleteAccountRes
   }
 
   try {
-    // Re-authenticate if password provided (required for sensitive operations)
-    if (password) {
-      const credential = EmailAuthProvider.credential(user.email!, password);
-      await reauthenticateWithCredential(user, credential);
+    // Re-authenticate BEFORE touching any data, so a failure never leaves a half-deleted account.
+    if (user.providerData.some((p) => p.providerId === 'password')) {
+      if (!password || !user.email) {
+        return { success: false, error: 'Please enter your password to confirm.' };
+      }
+      await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, password));
+    } else {
+      await reauthenticateWithGoogle(user);
     }
 
     const uid = user.uid;
@@ -54,24 +58,22 @@ export async function deleteAccount(password?: string): Promise<DeleteAccountRes
 
     await batch.commit();
 
-    // 5. Delete Firebase Auth user
+    // 5. Delete Firebase Auth user, then wipe local caches
     await deleteUser(user);
+    await clearLocalCache(true);
 
     return { success: true };
   } catch (error: any) {
     console.error('Delete account error:', error);
     
-    if (error.code === 'auth/requires-recent-login') {
-      return { 
-        success: false, 
-        error: 'Please re-enter your password to confirm account deletion' 
-      };
+    const code = error?.code || '';
+    if (code === 'auth/wrong-password' || code === 'auth/invalid-credential') {
+      return { success: false, error: 'Incorrect password.' };
     }
-    
-    return { 
-      success: false, 
-      error: error.message || 'Failed to delete account. Please try again.' 
-    };
+    if (code === 'auth/requires-recent-login') {
+      return { success: false, error: 'Please sign in again, then retry.' };
+    }
+    return { success: false, error: 'Failed to delete account. Please try again.' };
   }
 }
 
@@ -83,13 +85,13 @@ export async function exportUserData(): Promise<string | null> {
     const uid = user.uid;
     
     // Fetch all user data
-    const userDoc = await getDocs(query(collection(db, 'users'), where('uid', '==', uid)));
+    const userDoc = await getDoc(doc(db, 'users', uid));
     const territories = await getDocs(query(collection(db, 'territories'), where('uid', '==', uid)));
     const sessions = await getDocs(query(collection(db, 'sessions'), where('uid', '==', uid)));
     const notifications = await getDocs(collection(db, 'users', uid, 'notifications'));
 
     const data = {
-      profile: userDoc.docs[0]?.data() || {},
+      profile: userDoc.data() || {},
       territories: territories.docs.map(d => d.data()),
       sessions: sessions.docs.map(d => d.data()),
       notifications: notifications.docs.map(d => d.data()),

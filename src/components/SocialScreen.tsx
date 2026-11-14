@@ -109,6 +109,8 @@ export function SocialScreen({ onClose }: { onClose: () => void }) {
     setIsSearching(false);
   };
 
+  const run = (p: Promise<unknown>) => p.catch(() => setSearchError('Action failed. Please try again.'));
+
   const handleSendRequest = async () => {
     if (!authUser || !searchResult) return;
     
@@ -122,7 +124,7 @@ export function SocialScreen({ onClose }: { onClose: () => void }) {
       return;
     }
 
-    await sendFriendRequest(authUser.uid, searchResult.uid, userProfile?.displayName || 'A runner');
+    await run(sendFriendRequest(authUser.uid, searchResult.uid, userProfile?.displayName || 'A runner'));
     setSearchResult(null);
     setSearchCode('');
     // Show some success feedback (could use a toast here)
@@ -228,13 +230,13 @@ export function SocialScreen({ onClose }: { onClose: () => void }) {
                   </div>
                   <div className="flex gap-2">
                     <button 
-                      onClick={() => authUser && acceptFriendRequest(authUser.uid, req.uid)}
+                      onClick={() => authUser && run(acceptFriendRequest(authUser.uid, req.uid))}
                       className="p-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 rounded-full transition-colors"
                     >
                       <Check className="w-5 h-5" />
                     </button>
                     <button 
-                      onClick={() => authUser && declineFriendRequest(authUser.uid, req.uid)}
+                      onClick={() => authUser && run(declineFriendRequest(authUser.uid, req.uid))}
                       className="p-2 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 rounded-full transition-colors"
                     >
                       <X className="w-5 h-5" />
@@ -304,7 +306,7 @@ export function SocialScreen({ onClose }: { onClose: () => void }) {
               <button
                 onClick={() => {
                   if (authUser && friendToRemove) {
-                    removeFriend(authUser.uid, friendToRemove.uid);
+                    run(removeFriend(authUser.uid, friendToRemove.uid));
                     setFriendToRemove(null);
                   }
                 }}

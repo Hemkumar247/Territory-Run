@@ -1,3 +1,8 @@
+import { Capacitor } from '@capacitor/core';
+
+// The APK is served from https://localhost, so it must call the deployed API by absolute URL.
+const API_BASE = Capacitor.isNativePlatform() ? 'https://territory-run-drab.vercel.app' : '';
+
 const aiResponseCache: Map<string, string> = new Map();
 const OFFLINE = 'Tactician AI (Offline): Expand your perimeter.';
 
@@ -12,7 +17,7 @@ async function adviceFromServer(distanceTotal: number, recentRuns: number): Prom
   const idToken = await auth.currentUser?.getIdToken();
   if (!idToken) return OFFLINE;
 
-  const response = await fetch('/api/tactician', {
+  const response = await fetch(`${API_BASE}/api/tactician`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

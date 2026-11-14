@@ -46,7 +46,6 @@ jobs:
       - name: Build web assets
         run: npm run build
         env:
-          VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
           VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
           VITE_GA_MEASUREMENT_ID: ${{ secrets.VITE_GA_MEASUREMENT_ID }}
 
@@ -74,7 +73,7 @@ jobs:
       - name: Rename APK
         run: |
           mkdir -p out
-          cp android/app/build/outputs/apk/release/app-release.apk "out/TerritoryRun-${TAG}.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk out/TerritoryRun.apk
           ls -la out
 
       - name: Upload APK to GitHub Release
@@ -86,7 +85,7 @@ jobs:
             ## Territory Run ${{ env.TAG }}
 
             ### Installation
-            1. Download `TerritoryRun-${{ env.TAG }}.apk` below on your Android phone
+            1. Download `TerritoryRun.apk` below on your Android phone
             2. When prompted, allow **Install unknown apps** for your browser/file manager
             3. Open the downloaded APK and tap **Install**
 

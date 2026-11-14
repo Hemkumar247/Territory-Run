@@ -1,7 +1,5 @@
 import { collection, doc, onSnapshot, query, setDoc, updateDoc, where, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-// unused import User
-import { handleFirestoreError, OperationType } from '../lib/errors';
 
 export interface AppNotification {
   id: string;
@@ -63,17 +61,16 @@ export const sendNotification = async (
 ) => {
   try {
     const notifRef = doc(collection(db, 'users', targetUserId, 'notifications'));
-    const notification: AppNotification = {
+    // Firestore rejects `undefined`, so only include optional fields when present.
+    await setDoc(notifRef, {
       id: notifRef.id,
       type,
-      message,
+      message: message.slice(0, 200),
       timestamp: serverTimestamp(),
       read: false,
-      relatedUserId,
-      data
-    };
-    
-    await setDoc(notifRef, notification);
+      ...(relatedUserId ? { relatedUserId } : {}),
+      ...(data ? { data } : {}),
+    });
   } catch (error) {
     console.error("Error sending notification:", error);
   }
@@ -128,7 +125,7 @@ export const listenToNotifications = (
     // Only pass NEW notifications to callback (dynamic, not persistent)
     callback(newNotifications);
   }, (error) => {
-    handleFirestoreError(error, OperationType.LIST, `users/${userId}/notifications`);
+    console.error('notifications listener:', error.code);
   });
 
   return unsubscribeNotifications;

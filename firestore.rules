@@ -81,6 +81,30 @@ service cloud.firestore {
     }
 
     // ===============================================================
+    // Security helpers
+    // ===============================================================
+    // Stats can only grow, and only by a plausible amount per write (stops trivial leaderboard cheating).
+    // NOTE: still client-reported; true anti-cheat needs a server/Cloud Function to validate runs.
+    function ownerStatsAreSane() {
+      let old = resource.data;
+      let nw = request.resource.data;
+      return nw.totalDistance >= old.totalDistance && nw.totalDistance - old.totalDistance <= 500000 &&
+             nw.wins >= old.wins && nw.wins - old.wins <= 1 &&
+             nw.losses >= old.losses && nw.losses - old.losses <= 1 &&
+             nw.get('totalRuns', 0) >= old.get('totalRuns', 0) &&
+             nw.get('totalRuns', 0) - old.get('totalRuns', 0) <= 1;
+    }
+
+    // Owners cannot forge friendships or incoming requests: friends may only gain people who sent a request,
+    // and friendRequests may only shrink (new requests are appended by the sender via the rule below).
+    function ownerSocialListsAreSane() {
+      let old = resource.data;
+      let nw = request.resource.data;
+      return nw.get('friends', []).hasOnly(old.get('friends', []).concat(old.get('friendRequests', []))) &&
+             old.get('friendRequests', []).hasAll(nw.get('friendRequests', []));
+    }
+
+    // ===============================================================
     // Domain Validators
     // ===============================================================
 
@@ -117,9 +141,10 @@ service cloud.firestore {
              data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
              (!('id' in data) || (data.id is string && data.id.size() > 0 && data.id.size() < 100)) &&
              data.coordinates is list && data.coordinates.size() <= 5000 && // Limit polygon complexity
-             data.strength is number && data.strength >= 0 &&
+             data.coordinates.size() >= 3 &&
+             data.strength is number && data.strength >= 0 && data.strength <= 100 &&
              data.lastUpdated is timestamp &&
-             data.areaKm2 is number && data.areaKm2 >= 0;
+             data.areaKm2 is number && data.areaKm2 >= 0 && data.areaKm2 <= 1000;
     }
 
     function isValidSession(data) {
@@ -127,20 +152,21 @@ service cloud.firestore {
              data.uid is string && data.uid.size() > 0 && data.uid.size() < 100 &&
              data.startTime is timestamp &&
              data.endTime is timestamp &&
-             data.distanceCovered is number && data.distanceCovered >= 0 &&
+             data.distanceCovered is number && data.distanceCovered >= 0 && data.distanceCovered <= 500000 &&
              data.coordinatesTrail is list && data.coordinatesTrail.size() <= 5000 && // Limit trail complexity
              data.territoryGained is number && data.territoryGained >= 0 &&
              data.territoryLost is number && data.territoryLost >= 0;
     }
 
     function isValidNotification(data) {
-      return hasOnlyAllowedFields(['id', 'type', 'message', 'timestamp', 'read', 'relatedUserId']) &&
+      return hasOnlyAllowedFields(['id', 'type', 'message', 'timestamp', 'read', 'relatedUserId', 'data']) &&
              data.id is string && data.id.size() > 0 && data.id.size() < 100 &&
              data.type in ['friend_request', 'territory_contested', 'territory_lost'] &&
              data.message is string && data.message.size() > 0 && data.message.size() < 500 &&
              data.timestamp is timestamp &&
              data.read is bool &&
-             (!('relatedUserId' in data) || (data.relatedUserId is string && data.relatedUserId.size() < 100));
+             (!('relatedUserId' in data) || (data.relatedUserId is string && data.relatedUserId.size() < 100)) &&
+             (!('data' in data) || (data.data is map && data.data.keys().size() <= 4));
     }
 
     // ===============================================================
@@ -160,7 +186,9 @@ service cloud.firestore {
       // Any authenticated user can add their UID to the friendRequests array of another user.
       allow update: if (isOwner(userId) && 
                         isValidUser(request.resource.data) && 
-                        uidNotModified()) ||
+                        uidNotModified() &&
+                        ownerStatsAreSane() &&
+                        ownerSocialListsAreSane()) ||
                        // Adding to friendRequests (Send friend request)
                        (isAuthenticated() && 
                         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['friendRequests']) &&
@@ -190,12 +218,21 @@ service cloud.firestore {
                         )
                        );
                         
+      // Owner can delete their own profile (account deletion)
+      allow delete: if isOwner(userId);
+
       match /notifications/{notificationId} {
         // Owner can read their notifications
         allow read: if isOwner(userId);
         
         // Anyone authenticated can create a notification for a user
-        allow create: if isAuthenticated() && isValidNotification(request.resource.data);
+        // The sender is recorded in relatedUserId and must be the caller (no spoofing, no self-spam).
+        allow create: if isAuthenticated() &&
+                         isValidNotification(request.resource.data) &&
+                         request.resource.data.relatedUserId == request.auth.uid &&
+                         request.auth.uid != userId &&
+                         request.resource.data.id == notificationId &&
+                         request.resource.data.read == false;
         
         // Owner can update (e.g., mark as read) or delete their notifications
         allow update: if isOwner(userId) && isValidNotification(request.resource.data);
@@ -234,7 +271,8 @@ service cloud.firestore {
                        
       // Sessions are immutable once created (no updates allowed)
       allow update: if false;
-      allow delete: if false;
+      // Owner may delete their own sessions (account deletion / data erasure)
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
     }
   }
 }

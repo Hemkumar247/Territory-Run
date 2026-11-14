@@ -30,6 +30,11 @@ async function performSaveRunSession(
   const startTime = new Date(trail[0].timestamp);
   const endTime = new Date(trail[trail.length - 1].timestamp);
 
+  // Firestore rules cap a stored trail at 5000 points; thin very long runs (distance/territory use the full trail).
+  const MAX_TRAIL_POINTS = 2000;
+  const step = Math.ceil(trail.length / MAX_TRAIL_POINTS);
+  const storedTrail = step > 1 ? trail.filter((_, i) => i % step === 0 || i === trail.length - 1) : trail;
+
   // 1. Save the Session
   const sessionRef = doc(collection(db, 'sessions'));
   const sessionData: Session = {
@@ -37,7 +42,7 @@ async function performSaveRunSession(
     startTime,
     endTime,
     distanceCovered,
-    coordinatesTrail: trail,
+    coordinatesTrail: storedTrail,
     territoryGained: territoryArea,
     territoryLost: 0,
   };

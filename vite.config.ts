@@ -89,6 +89,7 @@ export default defineConfig(({mode}) => {
       tacticianDevApi(geminiKey),
       VitePWA({
         registerType: 'autoUpdate',
+        injectRegister: false, // registered manually in main.tsx, web only (the APK bundles its own assets)
         includeAssets: [
           'icon.svg',
           'apple-touch-icon.png',

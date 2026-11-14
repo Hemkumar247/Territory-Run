@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 import { Mail, Lock, User, ArrowRight, Loader2, Map } from 'lucide-react';
-import { signInWithGoogle, checkAndCreateUserProfile } from '../services/authService';
+import { signInWithGoogle, checkAndCreateUserProfile, authErrorMessage } from '../services/authService';
 import { auth } from '../lib/firebase';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, sendPasswordResetEmail, signInWithEmailAndPassword } from 'firebase/auth';
 import { PWAInstallButton } from './PWAInstallButton';
 
 export function AuthScreen() {
@@ -12,41 +12,69 @@ export function AuthScreen() {
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
     setLoading(true);
     setError(null);
+    setInfo(null);
 
+    const cleanEmail = email.trim();
     try {
       if (isLogin) {
-        const result = await signInWithEmailAndPassword(auth, email, password);
+        const result = await signInWithEmailAndPassword(auth, cleanEmail, password);
         await checkAndCreateUserProfile(result.user);
       } else {
         if (!displayName.trim()) {
-          throw new Error('Display name is required for registration.');
+          setError('Display name is required.');
+          return;
         }
-        const result = await createUserWithEmailAndPassword(auth, email, password);
+        if (password.length < 8) {
+          setError('Password must be at least 8 characters.');
+          return;
+        }
+        const result = await createUserWithEmailAndPassword(auth, cleanEmail, password);
         await checkAndCreateUserProfile(result.user, displayName);
       }
-    } catch (err: any) {
-      console.error('Auth Error:', err);
-      setError(err.message || 'Authentication failed. Please try again.');
+    } catch (err) {
+      console.error('Auth Error:', (err as { code?: string })?.code || err);
+      setError(authErrorMessage(err));
     } finally {
       setLoading(false);
     }
   };
 
   const handleGoogleAuth = async () => {
+    if (loading) return;
     setLoading(true);
     setError(null);
+    setInfo(null);
     try {
       await signInWithGoogle();
-    } catch (err: any) {
-      setError(err.message || 'Google Sign-In failed.');
+    } catch (err) {
+      console.error('Google Auth Error:', (err as { code?: string })?.code || err);
+      setError(authErrorMessage(err));
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleReset = async () => {
+    setError(null);
+    setInfo(null);
+    if (!email.trim()) {
+      setError('Enter your email above first.');
+      return;
+    }
+    try {
+      await sendPasswordResetEmail(auth, email.trim());
+    } catch (err) {
+      // Same message either way so we never reveal which emails are registered.
+      console.error('Reset Error:', (err as { code?: string })?.code || err);
+    }
+    setInfo('If that email has an account, a reset link is on its way.');
   };
 
   return (
@@ -79,6 +107,12 @@ export function AuthScreen() {
           </div>
         )}
 
+        {info && (
+          <div className="rounded-2xl bg-teal-500/10 p-4 border border-teal-500/20">
+            <p className="text-sm text-teal-500 font-medium text-center">{info}</p>
+          </div>
+        )}
+
         <form className="mt-8 space-y-6" onSubmit={handleEmailAuth}>
           <div className="space-y-4">
             {!isLogin && (
@@ -89,6 +123,8 @@ export function AuthScreen() {
                 <input
                   type="text"
                   required
+                  maxLength={50}
+                  autoComplete="nickname"
                   className="block w-full rounded-2xl border border-black/10 dark:border-white/10 bg-white/40 dark:bg-black/40 py-4 pl-12 pr-4 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-teal-500/50 focus:bg-white/60 dark:focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-teal-500/50 sm:text-sm transition-all backdrop-blur-sm"
                   placeholder="Display Name"
                   value={displayName}
@@ -103,6 +139,7 @@ export function AuthScreen() {
               <input
                 type="email"
                 required
+                autoComplete="email"
                 className="block w-full rounded-2xl border border-black/10 dark:border-white/10 bg-white/40 dark:bg-black/40 py-4 pl-12 pr-4 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-teal-500/50 focus:bg-white/60 dark:focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-teal-500/50 sm:text-sm transition-all backdrop-blur-sm"
                 placeholder="Email address"
                 value={email}
@@ -116,6 +153,8 @@ export function AuthScreen() {
               <input
                 type="password"
                 required
+                minLength={isLogin ? undefined : 8}
+                autoComplete={isLogin ? 'current-password' : 'new-password'}
                 className="block w-full rounded-2xl border border-black/10 dark:border-white/10 bg-white/40 dark:bg-black/40 py-4 pl-12 pr-4 text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 focus:border-teal-500/50 focus:bg-white/60 dark:focus:bg-black/60 focus:outline-none focus:ring-1 focus:ring-teal-500/50 sm:text-sm transition-all backdrop-blur-sm"
                 placeholder="Password"
                 value={password}
@@ -140,6 +179,15 @@ export function AuthScreen() {
               )}
             </button>
           </div>
+          {isLogin && (
+            <button
+              type="button"
+              onClick={handleReset}
+              className="block mx-auto text-xs font-bold uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
+            >
+              Forgot password?
+            </button>
+          )}
         </form>
 
         <div className="mt-8">
@@ -154,6 +202,7 @@ export function AuthScreen() {
 
           <div className="mt-8">
             <button
+              type="button"
               onClick={handleGoogleAuth}
               disabled={loading}
               className="flex w-full items-center justify-center gap-3 rounded-2xl border border-black/10 dark:border-white/10 bg-black/5 dark:bg-white/5 px-4 py-4 text-sm font-medium text-slate-900 dark:text-white hover:bg-black/10 dark:hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-black/20 dark:focus:ring-white/20 focus:ring-offset-2 focus:ring-offset-slate-100 dark:focus:ring-offset-[#050505] disabled:opacity-50 transition-all duration-300 hover:scale-[0.98] backdrop-blur-sm"
@@ -183,9 +232,11 @@ export function AuthScreen() {
 
         <div className="mt-8 text-center">
           <button
+            type="button"
             onClick={() => {
               setIsLogin(!isLogin);
               setError(null);
+              setInfo(null);
             }}
             className="text-xs font-bold uppercase tracking-widest text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"
           >

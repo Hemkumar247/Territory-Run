@@ -35,6 +35,10 @@ const config: CapacitorConfig = {
     PushNotifications: {
       presentationOptions: ['badge', 'sound', 'alert'],
     },
+    FirebaseAuthentication: {
+      skipNativeAuth: true, // native Google picker only; session is created by the web SDK
+      providers: ['google.com'],
+    },
     Haptics: {},
     Device: {},
     Network: {},

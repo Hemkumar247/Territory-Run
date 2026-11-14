@@ -115,7 +115,7 @@ function getTerritoryBadgeSVG(user: User | undefined): string {
 export function MapScreen() {
   const { userProfile, authUser } = useFirebase();
   const { currentLocation, trail, error, isTracking, isRunning, isPaused, elapsedTime, startRun, pauseRun, resumeRun, endRun, resetRun, simulateRun } = useLocation();
-  const { territories, leaderboardUsers, loading } = useGlobalData(authUser?.email);
+  const { territories, leaderboardUsers, loading } = useGlobalData();
   
   // Calculate user's total territory stats
   const userTerritoryStats = useMemo(() => {

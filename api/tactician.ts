@@ -5,8 +5,32 @@ const OFFLINE = 'Tactician AI (Offline): Expand your perimeter.';
 const EMPTY_TEXT = 'Tactician AI: Perimeter is exposed. Run a defensive loop today.';
 
 type ApiResponse = {
-  status: (code: number) => { json: (body: unknown) => void };
+  status: (code: number) => { json: (body: unknown) => void; end: () => void };
+  setHeader: (name: string, value: string) => void;
 };
+
+// Browser origin of the deployed site plus the Capacitor WebView origins used by the Android/iOS apps.
+const ALLOWED_ORIGINS = new Set([
+  'https://territory-run-drab.vercel.app',
+  'https://territory-run-hems-projects-0790fffd.vercel.app',
+  'https://localhost',
+  'capacitor://localhost',
+]);
+
+const RATE_LIMIT = 10; // requests per uid per minute
+const hits = new Map<string, number[]>(); // ponytail: per-instance memory, use Redis/KV if you scale out
+
+export function rateLimited(uid: string, now = Date.now()): boolean {
+  const recent = (hits.get(uid) || []).filter((t) => now - t < 60_000);
+  if (recent.length >= RATE_LIMIT) {
+    hits.set(uid, recent);
+    return true;
+  }
+  recent.push(now);
+  hits.set(uid, recent);
+  if (hits.size > 5000) hits.clear();
+  return false;
+}
 
 export function cannedAdvice(distanceTotal: number): string {
   return distanceTotal > 10
@@ -41,10 +65,10 @@ function firebaseWebApiKey(): string {
   return '';
 }
 
-export async function isProjectUser(idToken: string): Promise<boolean> {
-  if (!idToken) return false;
+export async function projectUserId(idToken: string): Promise<string> {
+  if (!idToken) return '';
   const apiKey = firebaseWebApiKey();
-  if (!apiKey) return false;
+  if (!apiKey) return '';
   const response = await fetch(
     `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${encodeURIComponent(apiKey)}`,
     {
@@ -53,9 +77,14 @@ export async function isProjectUser(idToken: string): Promise<boolean> {
       body: JSON.stringify({ idToken }),
     }
   );
-  if (!response.ok) return false;
-  const data = (await response.json()) as { users?: unknown[] };
-  return Array.isArray(data.users) && data.users.length > 0;
+  if (!response.ok) return '';
+  const data = (await response.json()) as { users?: Array<{ localId?: string; disabled?: boolean }> };
+  const user = data.users?.[0];
+  return user?.localId && !user.disabled ? user.localId : '';
+}
+
+export async function isProjectUser(idToken: string): Promise<boolean> {
+  return Boolean(await projectUserId(idToken));
 }
 
 export async function createTacticalAdvice(
@@ -107,14 +136,28 @@ function safeMessage(error: unknown): string {
 }
 
 export default async function handler(
-  req: { method?: string; body?: unknown; headers?: { authorization?: unknown } },
+  req: { method?: string; body?: unknown; headers?: { authorization?: unknown; origin?: unknown } },
   res: ApiResponse
 ) {
+  const origin = typeof req.headers?.origin === 'string' ? req.headers.origin : '';
+  if (ALLOWED_ORIGINS.has(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Max-Age', '86400');
+  }
+  res.setHeader('Cache-Control', 'no-store');
+
   try {
+    if (req.method === 'OPTIONS') {
+      res.status(204).end();
+      return;
+    }
+
     if (req.method === 'GET') {
-      res.status(process.env.GEMINI_API_KEY ? 200 : 503).json({
-        configured: Boolean(process.env.GEMINI_API_KEY),
-      });
+      // Health check only: does not reveal whether a key is configured.
+      res.status(200).json({ ok: true });
       return;
     }
 
@@ -138,9 +181,13 @@ export default async function handler(
     }
 
     const idToken = bearerToken(req.headers?.authorization);
-    const allowed = await isProjectUser(idToken);
-    if (!allowed) {
+    const uid = await projectUserId(idToken);
+    if (!uid) {
       res.status(401).json({ error: 'Sign in required' });
+      return;
+    }
+    if (rateLimited(uid)) {
+      res.status(429).json({ error: 'Too many requests' });
       return;
     }
 

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AlertTriangle, Trash2, Download, Loader2, X, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, Trash2, Download, X, CheckCircle2 } from 'lucide-react';
 import { deleteAccount, exportUserData } from '../services/accountService';
 import { useFirebase } from './FirebaseProvider';
 
@@ -10,6 +10,7 @@ interface DeleteAccountProps {
 
 export function DeleteAccount({ onClose, onDeleted }: DeleteAccountProps) {
   const { authUser } = useFirebase();
+  const hasPassword = !!authUser?.providerData.some((p) => p.providerId === 'password');
   const [step, setStep] = useState<'confirm' | 'password' | 'deleting' | 'success' | 'export'>('confirm');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -34,19 +35,20 @@ export function DeleteAccount({ onClose, onDeleted }: DeleteAccountProps) {
   };
 
   const handleDelete = async () => {
-    if (!password) {
+    if (hasPassword && !password) {
       setError('Please enter your password');
       return;
     }
     setLoading(true);
     setError(null);
     
-    const result = await deleteAccount(password);
+    const result = await deleteAccount(hasPassword ? password : undefined);
     if (result.success) {
       setStep('success');
       setTimeout(() => {
         onDeleted();
         onClose();
+        window.location.reload();
       }, 2000);
     } else {
       setError(result.error || 'Failed to delete account');
@@ -175,7 +177,7 @@ export function DeleteAccount({ onClose, onDeleted }: DeleteAccountProps) {
               </div>
               <h2 className="text-2xl font-display font-bold text-slate-900 dark:text-white">Confirm Deletion</h2>
               <p className="text-slate-600 dark:text-slate-400 mt-2">
-                Enter your password to confirm
+                {hasPassword ? 'Enter your password to confirm' : 'You will be asked to confirm with Google'}
               </p>
             </div>
 
@@ -186,7 +188,7 @@ export function DeleteAccount({ onClose, onDeleted }: DeleteAccountProps) {
             )}
 
             <div className="space-y-4">
-              <div className="relative">
+              {hasPassword && <div className="relative">
                 <input
                   type="password"
                   value={password}
@@ -196,7 +198,7 @@ export function DeleteAccount({ onClose, onDeleted }: DeleteAccountProps) {
                   className="w-full px-4 py-4 pr-12 rounded-2xl border border-black/10 dark:border-white/10 bg-white/50 dark:bg-black/30 text-slate-900 dark:text-white placeholder-slate-400 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20"
                   autoFocus
                 />
-              </div>
+              </div>}
 
               <div className="flex gap-3">
                 <button
@@ -207,7 +209,7 @@ export function DeleteAccount({ onClose, onDeleted }: DeleteAccountProps) {
                 </button>
                 <button
                   onClick={handleDelete}
-                  disabled={loading || !password}
+                  disabled={loading || (hasPassword && !password)}
                   className="flex-1 bg-red-500 text-white px-6 py-4 rounded-2xl font-bold uppercase tracking-wider hover:bg-red-600 transition-colors disabled:opacity-50 shadow-[0_0_20px_rgba(239,68,68,0.3)]"
                 >
                   {loading ? 'Deleting...' : 'Delete Permanently'}

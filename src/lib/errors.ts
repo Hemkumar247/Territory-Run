@@ -9,45 +9,33 @@ export enum OperationType {
   WRITE = 'write',
 }
 
-export interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId?: string;
-    email?: string | null;
-    emailVerified?: boolean;
-    isAnonymous?: boolean;
-    tenantId?: string | null;
-    providerInfo: {
-      providerId: string;
-      displayName: string | null;
-      email: string | null;
-      photoUrl: string | null;
-    }[];
-  };
+export class FirestoreOperationError extends Error {
+  code?: string;
+  constructor(message: string, code?: string) {
+    super(message);
+    this.name = 'FirestoreOperationError';
+    this.code = code;
+  }
 }
 
-export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: auth.currentUser?.uid,
-      email: auth.currentUser?.email,
-      emailVerified: auth.currentUser?.emailVerified,
-      isAnonymous: auth.currentUser?.isAnonymous,
-      tenantId: auth.currentUser?.tenantId,
-      providerInfo: auth.currentUser?.providerData.map((provider) => ({
-        providerId: provider.providerId,
-        displayName: provider.displayName,
-        email: provider.email,
-        photoUrl: provider.photoURL,
-      })) || [],
-    },
+/**
+ * Logs the failure (no email / profile data) and throws a short, user-safe error.
+ */
+export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null): never {
+  const code = (error as { code?: string })?.code;
+  console.error('Firestore Error:', {
     operationType,
     path,
-  };
-  
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+    code,
+    error: error instanceof Error ? error.message : String(error),
+    userId: auth.currentUser?.uid,
+  });
+  throw new FirestoreOperationError(
+    code === 'permission-denied'
+      ? 'You do not have permission to do that.'
+      : code === 'unavailable'
+        ? 'Network error. Check your connection and try again.'
+        : 'Could not complete the request. Please try again.',
+    code
+  );
 }

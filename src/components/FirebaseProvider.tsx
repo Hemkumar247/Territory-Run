@@ -1,7 +1,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User as FirebaseAuthUser, getRedirectResult, onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../lib/firebase';
-import { doc, getDocFromServer, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { Capacitor } from '@capacitor/core';
 import { User as CustomUser } from '../types';
 import { handleFirestoreError, OperationType } from '../lib/errors';
 import { checkAndCreateUserProfile } from '../services/authService';
@@ -26,28 +27,12 @@ export const FirebaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
-    // Handle mobile/Android PWA redirect sign-in results
-    getRedirectResult(auth)
-      .then((result) => {
-        if (result?.user) {
-          return checkAndCreateUserProfile(result.user);
-        }
-      })
-      .catch((error) => {
-        console.error('Redirect Sign-In Error:', error);
-      });
-
-    // Test connection to Firestore
-    const testConnection = async () => {
-      try {
-        await getDocFromServer(doc(db, 'test', 'connection'));
-      } catch (error) {
-        if (error instanceof Error && error.message.includes('the client is offline')) {
-          console.error('Please check your Firebase configuration.');
-        }
-      }
-    };
-    testConnection();
+    // Web only: finish a redirect-based Google sign-in. Native uses the Google account picker instead.
+    if (!Capacitor.isNativePlatform()) {
+      getRedirectResult(auth)
+        .then((result) => (result?.user ? checkAndCreateUserProfile(result.user) : undefined))
+        .catch((error) => console.error('Redirect Sign-In Error:', error?.code || error));
+    }
 
     const unsubscribeAuth = onAuthStateChanged(auth, (currentUser) => {
       setAuthUser(currentUser);

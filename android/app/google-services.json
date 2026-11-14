@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "826207528823",
+    "project_id": "studio-9769538007-90a53",
+    "storage_bucket": "studio-9769538007-90a53.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:826207528823:android:ea8c9461d563a7c62ae372",
+        "android_client_info": {
+          "package_name": "com.territoryrun.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "826207528823-cu59h2brgm9j9b4co308b1qcb83g3s81.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.territoryrun.app",
+            "certificate_hash": "91000674da13da749499545a33a8659ec32d7d90"
+          }
+        },
+        {
+          "client_id": "826207528823-97300bktl6uoqitic0q4vdplhcvdju1g.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAjRgQolNolj7TFiur4sr64tag0nR4Z4yk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "826207528823-97300bktl6uoqitic0q4vdplhcvdju1g.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

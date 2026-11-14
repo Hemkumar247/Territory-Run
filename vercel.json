@@ -4,7 +4,8 @@
   "outputDirectory": "dist",
   "functions": {
     "api/tactician.ts": {
-      "includeFiles": "firebase-applet-config.json"
+      "includeFiles": "firebase-applet-config.json",
+      "maxDuration": 30
     }
   },
   "framework": "vite",

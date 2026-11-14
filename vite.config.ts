@@ -7,7 +7,7 @@ import {VitePWA} from 'vite-plugin-pwa';
 import { sentryVitePlugin } from '@sentry/vite-plugin';
 import { createTacticalAdvice, isProjectUser, readAdviceInput } from './api/tactician';
 
-function tacticianDevApi(apiKey: string) {
+function tacticianDevApi(apiKey: string, nvidiaKey: string, nvidiaModel: string) {
   const handler: Connect.NextHandleFunction = (req, res, next) => {
     const url = req.url?.split('?')[0];
     if (url !== '/api/tactician') {
@@ -16,9 +16,9 @@ function tacticianDevApi(apiKey: string) {
     }
 
     if (req.method === 'GET') {
-      res.statusCode = apiKey ? 200 : 503;
+      res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ configured: Boolean(apiKey) }));
+      res.end(JSON.stringify({ ok: true }));
       return;
     }
 
@@ -52,7 +52,7 @@ function tacticianDevApi(apiKey: string) {
           return;
         }
 
-        const advice = await createTacticalAdvice(input.distanceTotal, input.recentRuns, apiKey);
+        const advice = await createTacticalAdvice(input.distanceTotal, input.recentRuns, apiKey, { apiKey: nvidiaKey, model: nvidiaModel });
         res.statusCode = 200;
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({ advice }));
@@ -78,6 +78,8 @@ function tacticianDevApi(apiKey: string) {
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   const geminiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
+  const nvidiaKey = env.NVIDIA_API_KEY || process.env.NVIDIA_API_KEY || '';
+  const nvidiaModel = env.NVIDIA_MODEL || process.env.NVIDIA_MODEL || '';
   const sentryAuthToken = env.SENTRY_AUTH_TOKEN || process.env.SENTRY_AUTH_TOKEN || '';
   const sentryOrg = env.SENTRY_ORG || process.env.SENTRY_ORG || '';
   const sentryProject = env.SENTRY_PROJECT || process.env.SENTRY_PROJECT || '';
@@ -86,7 +88,7 @@ export default defineConfig(({mode}) => {
     plugins: [
       react(),
       tailwindcss(),
-      tacticianDevApi(geminiKey),
+      tacticianDevApi(geminiKey, nvidiaKey, nvidiaModel),
       VitePWA({
         registerType: 'autoUpdate',
         injectRegister: false, // registered manually in main.tsx, web only (the APK bundles its own assets)

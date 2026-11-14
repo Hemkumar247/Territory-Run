@@ -87,41 +87,74 @@ export async function isProjectUser(idToken: string): Promise<boolean> {
   return Boolean(await projectUserId(idToken));
 }
 
-export async function createTacticalAdvice(
-  distanceTotal: number,
-  recentRuns: number,
-  apiKey: string
-): Promise<string> {
-  if (!apiKey) return cannedAdvice(distanceTotal);
-
-  try {
-    const prompt = `You are "Aura", a tactical AI assistant in a GPS territory-control running game.
+function buildPrompt(distanceTotal: number, recentRuns: number): string {
+  return `You are "Aura", a tactical AI assistant in a GPS territory-control running game.
 The player has run a total of ${distanceTotal.toFixed(1)}km across ${recentRuns} runs.
 Provide a 2-sentence logical, strategic advice on what kind of run they should do next to maximize their territory control.
 Be immersive, use military-tactical but fitness-friendly language.`;
+}
 
+/** Returns the model's text, or '' on any failure (timeout, quota/429, 5xx, empty answer) so the caller can fall back. */
+async function askGemini(prompt: string, apiKey: string): Promise<string> {
+  try {
     const response = await fetch(
       'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-        }),
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+        signal: AbortSignal.timeout(7000),
       }
     );
-    if (!response.ok) return OFFLINE;
+    if (!response.ok) return '';
     const data = (await response.json()) as {
       candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }>;
     };
-    const text = data.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('').trim();
-    return text || EMPTY_TEXT;
+    return data.candidates?.[0]?.content?.parts?.map((part) => part.text || '').join('').trim() || '';
   } catch {
-    return OFFLINE;
+    return '';
   }
+}
+
+/** NVIDIA NIM (OpenAI-compatible). Model is configurable via NVIDIA_MODEL, default GLM-4.7. */
+async function askNvidia(prompt: string, apiKey: string, model: string): Promise<string> {
+  try {
+    const response = await fetch('https://integrate.api.nvidia.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.7,
+        max_tokens: 200,
+        chat_template_kwargs: { enable_thinking: false }, // short answer, skip slow reasoning
+      }),
+      signal: AbortSignal.timeout(9000),
+    });
+    if (!response.ok) return '';
+    const data = (await response.json()) as { choices?: Array<{ message?: { content?: string | null } }> };
+    const raw = data.choices?.[0]?.message?.content || '';
+    return raw.replace(/<think>[\s\S]*?<\/think>/gi, '').trim();
+  } catch {
+    return '';
+  }
+}
+
+export async function createTacticalAdvice(
+  distanceTotal: number,
+  recentRuns: number,
+  geminiKey: string,
+  nvidia: { apiKey?: string; model?: string } = {}
+): Promise<string> {
+  if (!geminiKey && !nvidia.apiKey) return cannedAdvice(distanceTotal);
+
+  const prompt = buildPrompt(distanceTotal, recentRuns);
+  // Primary: Gemini. Fallback: NVIDIA (when Gemini is overloaded, rate-limited, down, or returns nothing).
+  const text =
+    (geminiKey && (await askGemini(prompt, geminiKey))) ||
+    (nvidia.apiKey && (await askNvidia(prompt, nvidia.apiKey, nvidia.model || 'z-ai/glm-4.7'))) ||
+    '';
+  return text.slice(0, 600) || (geminiKey || nvidia.apiKey ? OFFLINE : EMPTY_TEXT);
 }
 
 function bearerToken(header: unknown): string {
@@ -132,7 +165,7 @@ function bearerToken(header: unknown): string {
 
 function safeMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : 'Coach failed';
-  return message.replace(/AIza[0-9A-Za-z_-]{10,}/g, '[key]');
+  return message.replace(/AIza[0-9A-Za-z_-]{10,}/g, '[key]').replace(/nvapi-[0-9A-Za-z_-]{10,}/g, '[key]');
 }
 
 export default async function handler(
@@ -191,8 +224,10 @@ export default async function handler(
       return;
     }
 
-    const apiKey = process.env.GEMINI_API_KEY || '';
-    const advice = await createTacticalAdvice(input.distanceTotal, input.recentRuns, apiKey);
+    const advice = await createTacticalAdvice(input.distanceTotal, input.recentRuns, process.env.GEMINI_API_KEY || '', {
+      apiKey: process.env.NVIDIA_API_KEY,
+      model: process.env.NVIDIA_MODEL,
+    });
     res.status(200).json({ advice });
   } catch (error) {
     console.error('tactician', safeMessage(error));

@@ -5,6 +5,7 @@ import { Coordinate, Session, Territory, User } from '../types';
 import { checkAchievements } from '../lib/achievements';
 import { calculateNextStreak } from '../lib/streak';
 import { handleFirestoreError, OperationType } from '../lib/errors';
+import { queueRunForSync, syncQueuedRuns, isOnline } from '../lib/offlineQueue';
 
 /**
  * Persists a completed run session to the Firestore database.
@@ -18,15 +19,13 @@ import { handleFirestoreError, OperationType } from '../lib/errors';
  * @returns Array of new achievement string IDs unlocked by the run 
  * @throws FirestoreError on failing transaction states
  */
-export async function saveRunSession(
+async function performSaveRunSession(
   userProfile: User,
   trail: (Coordinate & { timestamp: number })[],
   distanceCovered: number,
-  territoryPolygon: [number, number][] | null, // [lng, lat] format from Turf
+  territoryPolygon: [number, number][] | null,
   territoryArea: number
-): Promise<string[] | undefined> {
-  if (trail.length === 0) return;
-
+): Promise<string[]> {
   const uid = userProfile.uid;
   const startTime = new Date(trail[0].timestamp);
   const endTime = new Date(trail[trail.length - 1].timestamp);
@@ -40,17 +39,15 @@ export async function saveRunSession(
     distanceCovered,
     coordinatesTrail: trail,
     territoryGained: territoryArea,
-    territoryLost: 0, // Placeholder for future logic
+    territoryLost: 0,
   };
   await setDoc(sessionRef, sessionData);
 
   // 2. Update the User's Territory if they formed a polygon
   if (territoryPolygon && territoryPolygon.length >= 3) {
-    // Note: territoryPolygon is passed from MapScreen as [lat, lng], Turf needs [lng, lat]
     const newCoords = territoryPolygon.map(p => [p[1], p[0]]);
     const newPoly = turf.polygon([[...newCoords, newCoords[0]]]);
     
-    // Fetch user's existing territories
     const territoriesQuery = query(collection(db, 'territories'), where('uid', '==', uid));
     const qs = await getDocs(territoriesQuery);
     
@@ -63,23 +60,18 @@ export async function saveRunSession(
       const existingCoords = existingTerritory.coordinates.map(c => [c.lng, c.lat]);
       const existingPoly = turf.polygon([[...existingCoords, existingCoords[0]]]);
       
-      // Check if they intersect
       const intersection = turf.intersect(turf.featureCollection([newPoly, existingPoly]));
       
       if (intersection) {
-        // They overlap. We union them.
         const unioned = turf.union(turf.featureCollection([newPoly, existingPoly]));
         
         if (unioned && unioned.geometry.type === 'Polygon') {
-          // Calculate new area
           const newArea = turf.area(unioned);
-          // Extract coords
           const uCoords = unioned.geometry.coordinates[0];
           const storedCoords = uCoords.map(c => ({ lat: c[1], lng: c[0] }));
           
-          // Strength increases up to a max (e.g., 100), plus it refreshes.
           const oldStrength = existingTerritory.strength || 0;
-          const newStrength = Math.min(100, oldStrength + 20); // add 20 to strength each time, max 100
+          const newStrength = Math.min(100, oldStrength + 20);
           
           const updatedTerritory: Partial<Territory> = {
             id: territoryDoc.id,
@@ -91,13 +83,12 @@ export async function saveRunSession(
           
           await updateDoc(territoryDoc.ref, updatedTerritory);
           merged = true;
-          break; // Stop after first merge for simplicity
+          break;
         }
       }
     }
     
     if (!merged) {
-      // Create a brand new disjoint territory
       const newTerritoryRef = doc(collection(db, 'territories'));
       const storedCoords = territoryPolygon.map(p => ({ lat: p[0], lng: p[1] }));
       
@@ -105,7 +96,7 @@ export async function saveRunSession(
         uid,
         id: newTerritoryRef.id,
         coordinates: storedCoords,
-        strength: 100, // Initial strength
+        strength: 100,
         lastUpdated: serverTimestamp() as any,
         areaKm2: territoryArea / 1000000,
       };
@@ -136,7 +127,7 @@ export async function saveRunSession(
   };
   
   if (territoryPolygon && territoryPolygon.length >= 3) {
-    userUpdates.territoryStrength = 100; // Reset strength if new territory
+    userUpdates.territoryStrength = 100;
   }
 
   if (newAchievements.length > 0) {
@@ -150,4 +141,46 @@ export async function saveRunSession(
   }
   
   return newAchievements;
+}
+
+export async function saveRunSession(
+  userProfile: User,
+  trail: (Coordinate & { timestamp: number })[],
+  distanceCovered: number,
+  territoryPolygon: [number, number][] | null,
+  territoryArea: number
+): Promise<string[] | undefined> {
+  if (trail.length === 0) return;
+
+  // If online, try to save directly
+  if (isOnline()) {
+    try {
+      return await performSaveRunSession(userProfile, trail, distanceCovered, territoryPolygon, territoryArea);
+    } catch (error) {
+      // Fall through to queue for later
+      console.warn('Online save failed, queuing for later:', error);
+    }
+  }
+
+  // Queue for later sync (offline or failed)
+  await queueRunForSync(userProfile.uid, {
+    trail,
+    distanceMeters: distanceCovered,
+    territoryPolygon: territoryPolygon || [],
+    territoryArea,
+  });
+  
+  return [];
+}
+
+export async function syncPendingRuns(userId: string): Promise<{ synced: number; failed: number }> {
+  return syncQueuedRuns(userId, async (data) => {
+    await performSaveRunSession(
+      { uid: userId } as User,
+      data.trail,
+      data.distanceMeters,
+      data.territoryPolygon as [number, number][],
+      data.territoryArea
+    );
+  });
 }

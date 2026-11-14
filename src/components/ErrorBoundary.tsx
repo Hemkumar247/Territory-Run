@@ -1,7 +1,9 @@
 import React, { ErrorInfo, ReactNode } from 'react';
+import * as Sentry from '@sentry/react';
 
 interface Props {
   children?: ReactNode;
+  fallback?: React.ComponentType<{ error: Error; reset: () => void }>;
 }
 
 interface State {
@@ -21,10 +23,22 @@ export class ErrorBoundary extends React.Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('Uncaught error:', error, errorInfo);
+    Sentry.captureException(error, {
+      extra: {
+        componentStack: errorInfo.componentStack,
+      },
+    });
   }
 
   public render() {
     if (this.state.hasError) {
+      if (this.props.fallback) {
+        return React.createElement(this.props.fallback, {
+          error: this.state.error!,
+          reset: () => this.setState({ hasError: false, error: null }),
+        });
+      }
+
       return (
         <div className="min-h-screen bg-red-50 flex flex-col items-center justify-center p-4">
           <div className="bg-white p-6 rounded-lg shadow-lg max-w-lg w-full">
@@ -46,3 +60,5 @@ export class ErrorBoundary extends React.Component<Props, State> {
     return this.props.children;
   }
 }
+
+export const SentryErrorBoundary = Sentry.ErrorBoundary;

@@ -105,11 +105,11 @@ export const listenToNotifications = (
   );
 
   unsubscribeNotifications = onSnapshot(q, (snapshot) => {
-    const notifications: AppNotification[] = [];
+    const newNotifications: AppNotification[] = [];
     snapshot.docChanges().forEach((change) => {
       if (change.type === 'added') {
         const data = change.doc.data() as AppNotification;
-        notifications.push(data);
+        newNotifications.push(data);
         
         if (shouldShowBrowserNotification) {
           // Show browser notification for new ones
@@ -125,16 +125,8 @@ export const listenToNotifications = (
       }
     });
     
-    // Return all unread, sorted by timestamp descending locally
-    const allUnread = snapshot.docs
-      .map(doc => doc.data() as AppNotification)
-      .sort((a, b) => {
-        const timeA = a.timestamp?.toMillis() || Date.now();
-        const timeB = b.timestamp?.toMillis() || Date.now();
-        return timeB - timeA;
-      });
-      
-    callback(allUnread);
+    // Only pass NEW notifications to callback (dynamic, not persistent)
+    callback(newNotifications);
   }, (error) => {
     handleFirestoreError(error, OperationType.LIST, `users/${userId}/notifications`);
   });

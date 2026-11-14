@@ -4,6 +4,7 @@ import path from 'path';
 import type { Connect } from 'vite';
 import {defineConfig, loadEnv} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
+import { sentryVitePlugin } from '@sentry/vite-plugin';
 import { createTacticalAdvice, isProjectUser, readAdviceInput } from './api/tactician';
 
 function tacticianDevApi(apiKey: string) {
@@ -77,6 +78,10 @@ function tacticianDevApi(apiKey: string) {
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
   const geminiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
+  const sentryAuthToken = env.SENTRY_AUTH_TOKEN || process.env.SENTRY_AUTH_TOKEN || '';
+  const sentryOrg = env.SENTRY_ORG || process.env.SENTRY_ORG || '';
+  const sentryProject = env.SENTRY_PROJECT || process.env.SENTRY_PROJECT || '';
+  
   return {
     plugins: [
       react(),
@@ -177,6 +182,16 @@ export default defineConfig(({mode}) => {
           type: 'module',
         },
       }),
+      ...(mode === 'production' && sentryAuthToken && sentryOrg && sentryProject
+        ? [
+            sentryVitePlugin({
+              authToken: sentryAuthToken,
+              org: sentryOrg,
+              project: sentryProject,
+              telemetry: false,
+            }),
+          ]
+        : []),
     ],
     test: {
       environment: 'jsdom',
@@ -187,6 +202,24 @@ export default defineConfig(({mode}) => {
       alias: {
         '@': path.resolve(__dirname, '.'),
       },
+    },
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom'],
+            'vendor-firebase': ['firebase/app', 'firebase/auth', 'firebase/firestore'],
+            'vendor-map': ['leaflet', 'react-leaflet', '@turf/turf'],
+            'vendor-ai': ['@google/genai'],
+            'vendor-animations': ['motion'],
+            'vendor-icons': ['lucide-react'],
+            'vendor-utils': ['date-fns', 'clsx', 'tailwind-merge'],
+            'vendor-pwa': ['vite-plugin-pwa'],
+          },
+        },
+        external: ['fsevents'],
+      },
+      chunkSizeWarningLimit: 600,
     },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.

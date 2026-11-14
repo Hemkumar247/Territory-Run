@@ -30,6 +30,8 @@ import { RunHistory } from './RunHistory';
 import { SocialScreen } from './SocialScreen';
 import { useWakeLock } from '../hooks/useWakeLock';
 import { PWAInstallButton } from './PWAInstallButton';
+import { A11yAudit } from './A11yAudit';
+import { trackEvent, AnalyticsEvents } from '../lib/analytics';
 
 // Fix for default Leaflet icon missing in Vite/Webpack
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -234,9 +236,9 @@ export function MapScreen() {
 
     const shouldShow = userProfile?.preferences?.notifications !== false;
 
-    const unsubscribe = listenToNotifications(authUser.uid, shouldShow, (notifications) => {
-      // Pick the first unread notification that is related to territory
-      const relevant = notifications.find(n => n.type === 'territory_contested' || n.type === 'territory_lost');
+    const unsubscribe = listenToNotifications(authUser.uid, shouldShow, (newNotifications) => {
+      // Only show NEW notifications (dynamic, not persistent)
+      const relevant = newNotifications.find(n => n.type === 'territory_contested' || n.type === 'territory_lost');
       if (relevant) {
         setActiveNotification(relevant);
         // Automatically mark as read after 10 seconds if not interacted with
@@ -247,11 +249,11 @@ export function MapScreen() {
           });
           markNotificationAsRead(authUser.uid, relevant.id);
         }, 10000);
-      } else {
-        // Just mark others as read
-        notifications.forEach(notif => markNotificationAsRead(authUser.uid, notif.id));
-        setActiveNotification(null);
       }
+      // Mark other new notifications as read silently
+      newNotifications
+        .filter(n => n.type !== 'territory_contested' && n.type !== 'territory_lost')
+        .forEach(notif => markNotificationAsRead(authUser.uid, notif.id));
     });
 
     return () => unsubscribe();
@@ -480,18 +482,28 @@ export function MapScreen() {
       return;
     }
 
+    trackEvent(AnalyticsEvents.RUN_COMPLETED, {
+      distance_km: distance,
+      area_m2: territoryArea,
+      duration_sec: elapsedTime,
+      has_territory: !!territoryPolygon,
+    });
+
     setIsSaving(true);
     try {
       const unlockedAchievements = await saveRunSession(
         userProfile,
         trail,
-        distance * 1000, // Convert km to meters for storage
+        distance * 1000,
         territoryPolygon,
         territoryArea
       );
       
-      // Send territory_lost notifications to users we contested
       if (territoryPolygon && territoryPolygon.length >= 3) {
+        trackEvent(AnalyticsEvents.TERRITORY_CLAIMED, {
+          area_m2: territoryArea,
+          distance_km: distance,
+        });
         let center = currentLocation || { lat: 0, lng: 0 };
         try {
           const tCoords = territoryPolygon.map(c => [c[1], c[0]]);
@@ -519,10 +531,20 @@ export function MapScreen() {
       const nextStreak = calculateNextStreak(userProfile);
       setSummaryData({ distance, area: territoryArea, streak: nextStreak.currentStreak });
       if (unlockedAchievements && unlockedAchievements.length > 0) {
+        unlockedAchievements.forEach(ach => {
+          trackEvent(AnalyticsEvents.ACHIEVEMENT_UNLOCKED, {
+            achievement_id: ach,
+          });
+        });
         setNewAchievements(unlockedAchievements);
         triggerHaptic([40, 60, 80]);
       } else {
         triggerHaptic(50);
+      }
+      if (nextStreak.currentStreak > 0 && [7, 14, 30, 60, 100].includes(nextStreak.currentStreak)) {
+        trackEvent(AnalyticsEvents.STREAK_MILESTONE, {
+          streak_days: nextStreak.currentStreak,
+        });
       }
       setSaveError(null);
       setShowSummary(true);
@@ -607,8 +629,10 @@ export function MapScreen() {
   }
 
   return (
-    <main aria-label="Game Screen" className="relative h-[100dvh] w-full bg-slate-100 dark:bg-[#050505] flex flex-col overflow-hidden">
-      {/* Top Navigation Bar */}
+    <>
+      <A11yAudit enabled={process.env.NODE_ENV === 'development'} />
+      <main aria-label="Game Screen" className="relative h-[100dvh] w-full bg-slate-100 dark:bg-[#050505] flex flex-col overflow-hidden">
+        {/* Top Navigation Bar */}
       <header aria-label="Status Bar" className="absolute top-0 left-0 right-0 z-[1000] flex items-center justify-between p-6 pt-[max(1.5rem,env(safe-area-inset-top))] pointer-events-none">
         <div role="status" aria-live="polite" className="pointer-events-auto flex items-center gap-3 glass-panel bg-white/90 dark:bg-black/40 px-5 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10">
           <div className="relative flex h-2.5 w-2.5">
@@ -923,9 +947,9 @@ export function MapScreen() {
             pace={formatPace(distance, elapsedTime)}
             time={formatTime(elapsedTime)}
             area={Math.round(territoryArea).toLocaleString()}
-            onStart={() => { triggerHaptic(40); startRun(); }}
-            onPause={() => { triggerHaptic(20); pauseRun(); }}
-            onResume={() => { triggerHaptic(30); resumeRun(); }}
+            onStart={() => { triggerHaptic(40); trackEvent(AnalyticsEvents.RUN_STARTED); startRun(); }}
+            onPause={() => { triggerHaptic(20); trackEvent(AnalyticsEvents.RUN_PAUSED, { distance_km: distance }); pauseRun(); }}
+            onResume={() => { triggerHaptic(30); trackEvent(AnalyticsEvents.RUN_RESUMED, { distance_km: distance }); resumeRun(); }}
             onStop={() => { triggerHaptic([30, 40]); handleFinishRun(); }}
           />
         </>
@@ -1050,5 +1074,6 @@ export function MapScreen() {
         )
       )}
     </main>
+    </>
   );
 }

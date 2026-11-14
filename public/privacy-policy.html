@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Privacy Policy - Territory Run</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; color: #1a1a2e; }
+        h1 { color: #080B12; border-bottom: 2px solid #00E5FF; padding-bottom: 10px; }
+        h2 { color: #00E5FF; margin-top: 30px; }
+        .last-updated { color: #666; font-size: 0.9em; margin-bottom: 30px; }
+        ul { padding-left: 20px; }
+        li { margin-bottom: 8px; }
+        .contact { background: #f0f4ff; padding: 15px; border-radius: 8px; margin-top: 30px; }
+    </style>
+</head>
+<body>
+    <h1>Privacy Policy</h1>
+    <p class="last-updated">Last updated: November 2024</p>
+
+    <h2>1. Information We Collect</h2>
+    <p>Territory Run collects the following data to provide the core game experience:</p>
+    <ul>
+        <li><strong>Location Data:</strong> GPS coordinates (latitude, longitude, accuracy, altitude, speed) during active runs to track your trail and calculate territory.</li>
+        <li><strong>Account Information:</strong> Email, display name, profile photo (via Google Sign-In or email/password), and a unique user ID.</li>
+        <li><strong>Game Data:</strong> Run history, distance covered, territory claimed, achievements, streaks, and leaderboard position.</li>
+        <li><strong>Device Information:</strong> Device model, OS version, app version, and push notification token (for territory alerts).</li>
+        <li><strong>Usage Analytics:</strong> Anonymous event data (run started, territory claimed, achievement unlocked) via Google Analytics 4.</li>
+    </ul>
+
+    <h2>2. How We Use Your Data</h2>
+    <ul>
+        <li>Track and display your running trail in real-time</li>
+        <li>Calculate territory polygons and area claimed</li>
+        <li>Sync data across devices via Firebase</li>
+        <li>Show nearby territories and contested zones</li>
+        <li>Send push notifications for territory contests (opt-in)</li>
+        <li>Generate leaderboards and achievement progress</li>
+        <li>Improve app performance and fix bugs</li>
+    </ul>
+
+    <h2>3. Data Sharing</h2>
+    <p>We do not sell your personal data. Data is shared only:</p>
+    <ul>
+        <li>With <strong>Firebase (Google)</strong> for authentication, database, and cloud functions</li>
+        <li>With <strong>Google Analytics</strong> for anonymous usage statistics</li>
+        <li>With <strong>other players</strong> in your game session (display name, territory, distance - no precise location)</li>
+        <li>When required by law or to protect our rights</li>
+    </ul>
+
+    <h2>4. Location Data</h2>
+    <ul>
+        <li>Collected <strong>only during active runs</strong> you explicitly start</li>
+        <li>Stored securely in Firebase Firestore</li>
+        <li>Used to calculate territory polygons (convex hull of your trail)</li>
+        <li>Shared with nearby players only as territory boundaries, not raw GPS points</li>
+        <li>You can delete all location data by deleting your account</li>
+    </ul>
+
+    <h2>5. Data Retention</h2>
+    <ul>
+        <li>Active accounts: Data retained while account exists</li>
+        <li>Deleted accounts: All personal data purged within 30 days</li>
+        <li>Analytics data: Aggregated and anonymized after 14 months</li>
+    </ul>
+
+    <h2>6. Your Rights</h2>
+    <ul>
+        <li>Access, correct, or delete your data via the app's <strong>Delete Account</strong> feature</li>
+        <li>Disable location permissions in device settings (limits functionality)</li>
+        <li>Opt out of push notifications in app settings</li>
+        <li>Request data export by contacting support</li>
+    </ul>
+
+    <h2>7. Children's Privacy</h2>
+    <p>Territory Run is not directed to children under 13. We do not knowingly collect data from children under 13. If you believe we have collected such data, contact us immediately.</p>
+
+    <h2>8. Security</h2>
+    <p>Data is encrypted in transit (TLS 1.2+) and at rest (Firebase encryption). Authentication uses Firebase Auth with secure token management.</p>
+
+    <h2>9. International Transfers</h2>
+    <p>Your data may be processed in the United States or other countries where Google/Firebase operates. Adequate safeguards are in place per GDPR/CCPA.</p>
+
+    <h2>10. Changes to This Policy</h2>
+    <p>We may update this policy. Changes will be posted in the app with a new "Last updated" date. Continued use constitutes acceptance.</p>
+
+    <div class="contact">
+        <h2>Contact Us</h2>
+        <p>Email: <a href="mailto:privacy@territoryrun.app">privacy@territoryrun.app</a></p>
+        <p>Support: <a href="mailto:support@territoryrun.app">support@territoryrun.app</a></p>
+    </div>
+</body>
+</html>

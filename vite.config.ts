@@ -1,15 +1,87 @@
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
+import type { Connect } from 'vite';
 import {defineConfig, loadEnv} from 'vite';
 import {VitePWA} from 'vite-plugin-pwa';
+import { createTacticalAdvice, isProjectUser, readAdviceInput } from './api/tactician';
+
+function tacticianDevApi(apiKey: string) {
+  const handler: Connect.NextHandleFunction = (req, res, next) => {
+    const url = req.url?.split('?')[0];
+    if (url !== '/api/tactician') {
+      next();
+      return;
+    }
+
+    if (req.method === 'GET') {
+      res.statusCode = apiKey ? 200 : 503;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ configured: Boolean(apiKey) }));
+      return;
+    }
+
+    if (req.method !== 'POST') {
+      res.statusCode = 405;
+      res.setHeader('Content-Type', 'application/json');
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      return;
+    }
+
+    const chunks: Buffer[] = [];
+    req.on('data', (chunk) => chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk)));
+    req.on('end', async () => {
+      try {
+        const body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}') as unknown;
+        const input = readAdviceInput(body);
+        if (!input) {
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Invalid input' }));
+          return;
+        }
+
+        const header = req.headers.authorization;
+        const match = typeof header === 'string' ? header.match(/^Bearer\s+(.+)$/i) : null;
+        const allowed = await isProjectUser(match?.[1]?.trim() || '');
+        if (!allowed) {
+          res.statusCode = 401;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'Sign in required' }));
+          return;
+        }
+
+        const advice = await createTacticalAdvice(input.distanceTotal, input.recentRuns, apiKey);
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ advice }));
+      } catch {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ advice: 'Tactician AI (Offline): Expand your perimeter.' }));
+      }
+    });
+  };
+
+  return {
+    name: 'tactician-dev-api',
+    configureServer(server) {
+      server.middlewares.use(handler);
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(handler);
+    },
+  };
+}
 
 export default defineConfig(({mode}) => {
   const env = loadEnv(mode, '.', '');
+  const geminiKey = env.GEMINI_API_KEY || process.env.GEMINI_API_KEY || '';
   return {
     plugins: [
       react(),
       tailwindcss(),
+      tacticianDevApi(geminiKey),
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: [
@@ -85,7 +157,7 @@ export default defineConfig(({mode}) => {
               },
             },
             {
-              urlPattern: /^https:\/\/[a-z]\.basemaps\.cartocdn\.com\/.*/i,
+              urlPattern: /^https:\/\/tile\.openstreetmap\.org\/.*/i,
               handler: 'StaleWhileRevalidate',
               options: {
                 cacheName: 'map-tiles-cache',
@@ -106,9 +178,6 @@ export default defineConfig(({mode}) => {
         },
       }),
     ],
-    define: {
-      'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-    },
     test: {
       environment: 'jsdom',
       globals: true,

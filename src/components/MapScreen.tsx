@@ -4,14 +4,16 @@ import L from 'leaflet';
 import { useLocation } from '../hooks/useLocation';
 import { useFirebase } from './FirebaseProvider';
 import { useGlobalData } from '../hooks/useGlobalData';
-import { LogOut, Navigation, AlertTriangle, Loader2, Moon, Sun, Play, X, CheckCircle2, Flame } from 'lucide-react';
+import { LogOut, Navigation, AlertTriangle, Loader2, Moon, Sun, X, CheckCircle2, Flame } from 'lucide-react';
 import { logout } from '../services/authService';
 import { saveRunSession } from '../services/runService';
+import { getTacticalAdvice } from '../services/aiTactician';
 import { Leaderboard } from './Leaderboard';
 import { WelcomeModal } from './WelcomeModal';
 import { OnboardingTutorial } from './OnboardingTutorial';
 import * as turf from '@turf/turf';
 import { calculateDecayedStrength, getStrengthLevel, escapeHtml, TerritorySpatialHash } from '../lib/utils';
+import { MAP_TILE_ATTRIBUTION, MAP_TILE_URL } from '../lib/mapTiles';
 import { calculateNextStreak } from '../lib/streak';
 import { requestNotificationPermission, listenToNotifications, markNotificationAsRead, AppNotification } from '../services/notificationService';
 
@@ -49,6 +51,20 @@ function RecenterAutomatically({ lat, lng, isRunning }: { lat: number; lng: numb
 }
 
 // Component to set initial bounds to include user territory and current location
+function FitMapToFrame() {
+  const map = useMap();
+  useEffect(() => {
+    const fix = () => map.invalidateSize();
+    const id = window.setTimeout(fix, 0);
+    window.addEventListener('resize', fix);
+    return () => {
+      window.clearTimeout(id);
+      window.removeEventListener('resize', fix);
+    };
+  }, [map]);
+  return null;
+}
+
 function InitialMapBounds({ currentLocation }: { currentLocation: any }) {
   const map = useMap();
   const [hasSetInitialBounds, setHasSetInitialBounds] = useState(false);
@@ -131,6 +147,7 @@ export function MapScreen() {
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [summaryData, setSummaryData] = useState({ distance: 0, area: 0, streak: 0 });
   const [activeNotification, setActiveNotification] = useState<AppNotification | null>(null);
+  const [coachAdvice, setCoachAdvice] = useState<string | null>(null);
 
   // Keep Android screen awake during active GPS runs
   useWakeLock(isRunning && !isPaused);
@@ -164,6 +181,44 @@ export function MapScreen() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, [activeTab, showSummary]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const distance = showSummary
+      ? (userProfile?.totalDistance || 0) + summaryData.distance
+      : (userProfile?.totalDistance || 0);
+    const runs = showSummary
+      ? (userProfile?.totalRuns || 0) + 1
+      : (userProfile?.totalRuns || 0);
+
+    const storageKey = `tactician:${distance.toFixed(1)}:${runs}`;
+    let cached: string | null = null;
+    try {
+      cached = sessionStorage.getItem(storageKey);
+    } catch {
+      cached = null;
+    }
+    if (cached) {
+      setCoachAdvice(cached);
+      return;
+    }
+
+    getTacticalAdvice(distance, runs).then((advice) => {
+      if (cancelled) return;
+      if (!advice.startsWith('Tactician AI (Offline)')) {
+        try {
+          sessionStorage.setItem(storageKey, advice);
+        } catch {
+          // Ignore private-mode storage failures.
+        }
+      }
+      setCoachAdvice(advice);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showSummary, summaryData.distance, userProfile?.totalDistance, userProfile?.totalRuns]);
 
   const handleCloseWelcome = () => {
     sessionStorage.setItem('welcomeShown', 'true');
@@ -522,6 +577,10 @@ export function MapScreen() {
             </div>
           )}
 
+          {coachAdvice && (
+            <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">{coachAdvice}</p>
+          )}
+
           {newAchievements.length > 0 && (
             <div className="mb-8">
               <p className="text-[10px] text-emerald-600 dark:text-emerald-400 uppercase tracking-[0.2em] font-semibold mb-3">Achievements Unlocked</p>
@@ -565,32 +624,28 @@ export function MapScreen() {
         {!isRunning && !isPaused && (
           <div className="pointer-events-auto flex items-center gap-2">
             <PWAInstallButton variant="compact" />
-            {authUser?.email === 'hemsai2004@gmail.com' && (
-              <>
-                <button
-                  onClick={() => {
-                    setForceTutorial(true);
-                    setShowWelcome(true);
-                  }}
-                  aria-label="Show Tutorial"
-                  className="flex items-center gap-2 glass-panel bg-white/90 dark:bg-black/40 px-4 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10 hover:bg-white dark:hover:bg-black/60 transition-colors"
-                >
-                  <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 tracking-[0.2em] uppercase">
-                    Tour
-                  </span>
-                </button>
-                <button
-                  onClick={simulateRun}
-                  aria-label="Simulate GPS Run"
-                  className="flex items-center gap-2 glass-panel bg-white/90 dark:bg-black/40 px-4 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10 hover:bg-white dark:hover:bg-black/60 transition-colors"
-                >
-                  <Navigation aria-hidden="true" className="h-3.5 w-3.5 text-slate-700 dark:text-slate-200" />
-                  <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 tracking-[0.2em] uppercase">
-                    Simulate
-                  </span>
-                </button>
-              </>
-            )}
+            <button
+              onClick={() => {
+                setForceTutorial(true);
+                setShowWelcome(true);
+              }}
+              aria-label="Show Tutorial"
+              className="flex items-center gap-2 glass-panel bg-white/90 dark:bg-black/40 px-4 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10 hover:bg-white dark:hover:bg-black/60 transition-colors"
+            >
+              <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 tracking-[0.2em] uppercase">
+                Tour
+              </span>
+            </button>
+            <button
+              onClick={simulateRun}
+              aria-label="Simulate GPS Run"
+              className="flex items-center gap-2 glass-panel bg-white/90 dark:bg-black/40 px-4 py-3 rounded-full shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10 hover:bg-white dark:hover:bg-black/60 transition-colors"
+            >
+              <Navigation aria-hidden="true" className="h-3.5 w-3.5 text-slate-700 dark:text-slate-200" />
+              <span className="text-[10px] font-bold text-slate-700 dark:text-slate-200 tracking-[0.2em] uppercase">
+                Simulate
+              </span>
+            </button>
           </div>
         )}
       </header>
@@ -606,7 +661,7 @@ export function MapScreen() {
               {saveError ? 'Save Failed' : 'GPS Signal Lost'}
             </h3>
             <p className="text-xs text-red-500/80 dark:text-red-200/60 mt-1 font-medium tracking-wide">
-              {saveError || 'Please ensure location services are enabled.'}
+              {saveError || 'Location is off. The map stays visible. Allow location to center on you, or use Simulate.'}
             </p>
           </div>
           {saveError && (
@@ -621,6 +676,15 @@ export function MapScreen() {
         </section>
       )}
 
+      {activeTab === 'map' && coachAdvice && !isRunning && !isPaused && !(error || saveError) && (
+        <div className="absolute top-24 left-4 right-4 z-[900] pointer-events-none">
+          <div className="pointer-events-auto mx-auto max-w-md glass-panel bg-white/90 dark:bg-black/40 px-4 py-3 rounded-2xl border border-black/10 dark:border-white/10 shadow-[0_10px_30px_rgba(0,0,0,0.12)]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-teal-700 dark:text-teal-300">Tactician</p>
+            <p className="mt-1 text-xs text-slate-700 dark:text-slate-200 leading-relaxed">{coachAdvice}</p>
+          </div>
+        </div>
+      )}
+
       {/* Loading Indicator for Territories */}
       {loading && currentLocation && (
         <div role="status" aria-busy="true" className="absolute top-28 left-1/2 -translate-x-1/2 z-[1000] glass-panel bg-white/90 dark:bg-black/40 px-6 py-3 rounded-full flex items-center gap-4 shadow-[0_10px_30px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_30px_rgba(0,0,0,0.5)] border border-black/10 dark:border-white/10">
@@ -630,60 +694,29 @@ export function MapScreen() {
       )}
 
       {/* Map Container */}
-      <section aria-label="Interactive Map Area" className="flex-1 w-full relative z-0">
-        {!currentLocation ? (
-          <div className="h-full w-full flex flex-col items-center justify-center bg-slate-100 dark:bg-[#050505] text-slate-600 dark:text-slate-400 relative overflow-hidden">
-            <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 rounded-full blur-[120px] mix-blend-screen pointer-events-none ${error ? 'bg-red-500/10' : 'bg-emerald-500/10'}`} />
-            
-            <div className="relative z-10 flex flex-col items-center text-center p-8 glass-panel bg-white/50 dark:bg-black/20 rounded-3xl max-w-[80%] border border-black/5 dark:border-white/5">
-              <div className={`w-24 h-24 rounded-full border border-black/10 dark:border-white/10 flex items-center justify-center mb-6 bg-black/5 dark:bg-white/5 shadow-[0_0_30px_rgba(0,0,0,0.05)] ${error ? 'dark:shadow-[0_0_30px_rgba(239,68,68,0.15)]' : 'dark:shadow-[0_0_30px_rgba(255,255,255,0.05)]'}`}>
-                {error ? (
-                  <AlertTriangle className="h-10 w-10 text-red-500 dark:text-red-400 drop-shadow-[0_0_15px_rgba(239,68,68,0.5)]" />
-                ) : (
-                  <Navigation className="h-10 w-10 animate-bounce text-emerald-500 dark:text-emerald-400 drop-shadow-[0_0_15px_rgba(52,211,153,0.5)]" />
-                )}
-              </div>
-              
-              <p className={`text-xs font-bold tracking-[0.3em] uppercase mb-2 ${error ? 'text-red-500 dark:text-red-400' : 'text-slate-600 dark:text-slate-300'}`}>
-                {error ? 'Location Blocked' : 'Acquiring Satellites'}
-              </p>
-              
-              <p className="text-sm font-medium text-slate-600 dark:text-slate-400 tracking-wide mb-6">
-                {error ? (authUser?.email === 'hemsai2004@gmail.com' ? 'Please grant location permissions to play automatically, or use the simulation.' : 'Please grant location permissions to play.') : 'Establishing secure connection...'}
-              </p>
-              
-              {error && authUser?.email === 'hemsai2004@gmail.com' && (
-                <button
-                  onClick={simulateRun}
-                  aria-label="Force Simulation due to GPS Error"
-                  className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-3 rounded-full font-bold uppercase tracking-widest text-xs hover:scale-105 transition-transform shadow-xl flex items-center gap-2"
-                >
-                  <Play className="w-4 h-4 fill-current" /> Try Simulation
-                </button>
-              )}
-            </div>
-          </div>
-        ) : (
+      <section aria-label="Interactive Map Area" className="absolute inset-0 z-0">
           <MapContainer 
             ref={setMapInstance}
-            center={[currentLocation.lat, currentLocation.lng]} 
-            zoom={16} 
-            className="h-full w-full bg-slate-100 dark:bg-[#050505]"
+            center={[currentLocation?.lat ?? 37.7749, currentLocation?.lng ?? -122.4194]} 
+            zoom={currentLocation ? 16 : 13}
+            maxZoom={19}
+            className={`territory-map h-full w-full ${isDarkMode ? 'territory-map-dark bg-[#0e1116]' : 'bg-slate-100'}`}
             zoomControl={false}
           >
             <ZoomControl position="bottomleft" />
+            <FitMapToFrame />
             <TileLayer
-              attribution='&copy; <a href="https://carto.com/">CartoDB</a>'
-              url={isDarkMode 
-                ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-              }
+              attribution={MAP_TILE_ATTRIBUTION}
+              url={MAP_TILE_URL}
+              maxZoom={19}
             />
             
             <InitialMapBounds 
               currentLocation={currentLocation} 
             />
-            <RecenterAutomatically lat={currentLocation.lat} lng={currentLocation.lng} isRunning={isRunning} />
+            {currentLocation && (
+              <RecenterAutomatically lat={currentLocation.lat} lng={currentLocation.lng} isRunning={isRunning} />
+            )}
             
             {/* Render all saved territories from the database */}
             {!loading && visibleTerritories.map((territory, index) => {
@@ -838,7 +871,7 @@ export function MapScreen() {
             )}
 
             {/* User's current location marker */}
-            <Marker 
+            {currentLocation && <Marker 
               position={[currentLocation.lat, currentLocation.lng]}
               icon={createPulsingIcon(userProfile?.territoryColor || '#3b82f6')}
             >
@@ -848,7 +881,7 @@ export function MapScreen() {
                   <p className="text-xs text-slate-600">Current Location</p>
                 </div>
               </Popup>
-            </Marker>
+            </Marker>}
 
             {/* User's trail */}
             {polylinePositions.length > 1 && (
@@ -863,7 +896,6 @@ export function MapScreen() {
               />
             )}
           </MapContainer>
-        )}
       </section>
 
       {/* Bottom HUD & Navigation */}

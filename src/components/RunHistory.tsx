@@ -4,6 +4,7 @@ import { db } from '../lib/firebase';
 import { useFirebase } from './FirebaseProvider';
 import { Session } from '../types';
 import { MapContainer, TileLayer, Polyline } from 'react-leaflet';
+import { MAP_TILE_ATTRIBUTION, MAP_TILE_URL } from '../lib/mapTiles';
 import { format } from 'date-fns';
 import { Activity, Map as MapIcon, Clock, Ruler, ArrowUpRight } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -142,15 +143,13 @@ export function RunHistory() {
                     dragging={false} 
                     scrollWheelZoom={false}
                     doubleClickZoom={false}
-                    className="h-full w-full z-0"
+                    className="territory-map territory-map-dark h-full w-full z-0"
+                    maxZoom={19}
                   >
                     <TileLayer
-                      url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
-                      className="dark:hidden"
-                    />
-                    <TileLayer
-                      url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-                      className="hidden dark:block"
+                      attribution={MAP_TILE_ATTRIBUTION}
+                      url={MAP_TILE_URL}
+                      maxZoom={19}
                     />
                     <Polyline 
                       positions={session.coordinatesTrail.map(c => [c.lat, c.lng])} 

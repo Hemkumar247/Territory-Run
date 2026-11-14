@@ -287,6 +287,28 @@ body {
   @apply antialiased selection:bg-emerald-500/30 transition-colors duration-500;
 }
 
+.territory-map.leaflet-container,
+.leaflet-container.territory-map {
+  height: 100%;
+  width: 100%;
+}
+
+.territory-map-dark .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.95);
+}
+
+.leaflet-control-attribution {
+  margin-bottom: 108px !important;
+  margin-right: 8px !important;
+  background: rgba(8, 11, 18, 0.72) !important;
+  color: #dbe4ea !important;
+  border-radius: 8px;
+}
+
+.leaflet-control-attribution a {
+  color: #7ee7f0 !important;
+}
+
 /* Leaflet Controls Customization */
 .leaflet-bar {
   border: 1px solid var(--color-glass-border) !important;

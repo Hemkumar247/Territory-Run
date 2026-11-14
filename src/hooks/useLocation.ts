@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Capacitor } from '@capacitor/core';
 import { Coordinate } from '../types';
 import * as turf from '@turf/turf';
+import { capacitorGPS, GPSConfig, LocationUpdate } from '../services/capacitorGPS';
 
 interface LocationState {
   currentLocation: Coordinate | null;
@@ -20,6 +22,8 @@ interface LocationState {
   simulateRun: () => void;
 }
 
+const isNative = Capacitor.isNativePlatform();
+
 export function useLocation(): LocationState {
   const [state, setState] = useState<Omit<LocationState, 'startRun' | 'pauseRun' | 'resumeRun' | 'endRun' | 'resetRun' | 'simulateRun'>>({
     currentLocation: null,
@@ -38,6 +42,7 @@ export function useLocation(): LocationState {
   const isSimulatingRef = useRef(false);
   const simulationIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const backgroundListenerRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     if (state.isRunning && !state.isPaused) {
@@ -53,95 +58,158 @@ export function useLocation(): LocationState {
   }, [state.isRunning, state.isPaused]);
 
   useEffect(() => {
-    if (!navigator.geolocation) {
-      setState((s) => ({ ...s, error: 'Geolocation is not supported by your browser' }));
-      return;
-    }
+    const setupGPS = async () => {
+      if (isNative) {
+        const hasPerm = await capacitorGPS.requestPermissions();
+        if (!hasPerm) {
+          setState(s => ({ ...s, error: 'Location permission denied. Please enable GPS in settings.', isTracking: false }));
+          return;
+        }
+      } else if (!navigator.geolocation) {
+        setState(s => ({ ...s, error: 'Geolocation is not supported by your browser', isTracking: false }));
+        return;
+      }
 
-    setState((s) => ({ ...s, isTracking: true }));
+      setState(s => ({ ...s, isTracking: true, error: null }));
 
-    const processLocationUpdate = (latitude: number, longitude: number, accuracy: number) => {
-      const newCoord = { lat: latitude, lng: longitude };
-      
-      setState((prev) => {
-        if (!isRunningRef.current || isPausedRef.current) {
+      const processLocationUpdate = (location: LocationUpdate) => {
+        const newCoord = { lat: location.latitude, lng: location.longitude };
+        
+        setState((prev) => {
+          if (!isRunningRef.current || isPausedRef.current) {
+            return {
+              ...prev,
+              currentLocation: newCoord,
+              error: null,
+            };
+          }
+
+          const lastPoint = prev.trail[prev.trail.length - 1];
+          if (lastPoint) {
+            const from = turf.point([lastPoint.lng, lastPoint.lat]);
+            const to = turf.point([location.longitude, location.latitude]);
+            const distance = turf.distance(from, to, { units: 'kilometers' });
+            
+            if (distance < 0.003 || location.accuracy > 50) {
+              return { ...prev, currentLocation: newCoord, error: null };
+            }
+          }
+          
+          const newTrailPoint = { ...newCoord, timestamp: location.timestamp };
           return {
             ...prev,
             currentLocation: newCoord,
+            trail: [...prev.trail, newTrailPoint],
             error: null,
           };
-        }
+        });
+      };
 
-        const lastPoint = prev.trail[prev.trail.length - 1];
-        if (lastPoint) {
-          const from = turf.point([lastPoint.lng, lastPoint.lat]);
-          const to = turf.point([longitude, latitude]);
-          const distance = turf.distance(from, to, { units: 'kilometers' });
-          
-          // Ignore if moved less than 3 meters (GPS noise) or accuracy is terrible (> 50m)
-          // 0.003 km = 3 meters
-          if (distance < 0.003 || accuracy > 50) {
-            return { ...prev, currentLocation: newCoord, error: null };
-          }
-        }
-        
-        const newTrailPoint = { ...newCoord, timestamp: Date.now() };
-        return {
-          ...prev,
-          currentLocation: newCoord,
-          trail: [...prev.trail, newTrailPoint],
-          error: null,
-        };
-      });
-    };
-
-    const watchId = navigator.geolocation.watchPosition(
-      (position) => {
-        if (isSimulatingRef.current) return; // Ignore real GPS if simulating
-        processLocationUpdate(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
-      },
-      (error) => {
+      const handleError = (error: Error) => {
         if (isSimulatingRef.current) return;
         
-        let errorMessage = 'An unknown error occurred';
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = 'Location permission denied. Please enable GPS.';
-            break;
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Location information is unavailable.';
-            break;
-          case error.TIMEOUT:
-            errorMessage = 'The request to get user location timed out.';
-            break;
-        }
-        setState((s) => ({ ...s, error: errorMessage, isTracking: false }));
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 5000,
-        maximumAge: 0,
-      }
-    );
+        const errorMessage = error.message || 'An unknown error occurred';
+        setState(s => ({ ...s, error: errorMessage, isTracking: false }));
+      };
 
-    // Supplementary poller for testing indoors or when moving slowly around a room
-    // WatchPosition sometimes stalls if the OS filters it, this forces hardware checks
-    let indoorPoller: NodeJS.Timeout | null = null;
-    indoorPoller = setInterval(() => {
-      if (!isSimulatingRef.current && isRunningRef.current && !isPausedRef.current) {
-        navigator.geolocation.getCurrentPosition(
+      if (isNative) {
+        capacitorGPS.setConfig({
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0,
+          distanceFilter: 5,
+        });
+
+        await capacitorGPS.startWatching(processLocationUpdate, handleError);
+        
+        backgroundListenerRef.current = capacitorGPS.addAppStateListener((state) => {
+          if (state === 'background' && isRunningRef.current && !isPausedRef.current) {
+            capacitorGPS.startBackgroundTracking();
+          } else if (state === 'active') {
+            capacitorGPS.stopBackgroundTracking();
+          }
+        });
+
+        const locationEnabled = await capacitorGPS.isLocationEnabled();
+        if (!locationEnabled) {
+          setState(s => ({ ...s, error: 'Please enable location services', isTracking: false }));
+        }
+      } else {
+        const watchId = navigator.geolocation.watchPosition(
           (position) => {
-            processLocationUpdate(position.coords.latitude, position.coords.longitude, position.coords.accuracy);
+            if (isSimulatingRef.current) return;
+            processLocationUpdate({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              accuracy: position.coords.accuracy,
+              altitude: position.coords.altitude,
+              speed: position.coords.speed,
+              heading: position.coords.heading,
+              timestamp: position.timestamp,
+            });
           },
-          () => {}, // Ignore errors for background polls
-          { enableHighAccuracy: true, maximumAge: 0, timeout: 3000 }
+          (error) => {
+            if (isSimulatingRef.current) return;
+            
+            let errorMessage = 'An unknown error occurred';
+            switch (error.code) {
+              case error.PERMISSION_DENIED:
+                errorMessage = 'Location permission denied. Please enable GPS.';
+                break;
+              case error.POSITION_UNAVAILABLE:
+                errorMessage = 'Location information is unavailable.';
+                break;
+              case error.TIMEOUT:
+                errorMessage = 'The request to get user location timed out.';
+                break;
+            }
+            setState(s => ({ ...s, error: errorMessage, isTracking: false }));
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 0,
+          }
         );
+
+        let indoorPoller: NodeJS.Timeout | null = null;
+        indoorPoller = setInterval(() => {
+          if (!isSimulatingRef.current && isRunningRef.current && !isPausedRef.current) {
+            navigator.geolocation.getCurrentPosition(
+              (position) => {
+                processLocationUpdate({
+                  latitude: position.coords.latitude,
+                  longitude: position.coords.longitude,
+                  accuracy: position.coords.accuracy,
+                  altitude: position.coords.altitude,
+                  speed: position.coords.speed,
+                  heading: position.coords.heading,
+                  timestamp: position.timestamp,
+                });
+              },
+              () => {},
+              { enableHighAccuracy: true, maximumAge: 0, timeout: 3000 }
+            );
+          }
+        }, 2000);
+
+        return () => {
+          navigator.geolocation.clearWatch(watchId);
+          if (indoorPoller) clearInterval(indoorPoller);
+        };
       }
-    }, 2000);
+    };
+
+    setupGPS();
 
     return () => {
-      navigator.geolocation.clearWatch(watchId);
-      if (indoorPoller) clearInterval(indoorPoller);
+      if (isNative) {
+        capacitorGPS.stopWatching();
+        capacitorGPS.stopBackgroundTracking();
+        if (backgroundListenerRef.current) {
+          backgroundListenerRef.current();
+        }
+      }
       if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
     };
   }, []);
@@ -175,7 +243,6 @@ export function useLocation(): LocationState {
   const simulateRun = useCallback(() => {
     setState(s => {
       const baseLocation = s.currentLocation || { lat: 37.7749, lng: -122.4194 };
-      // Move the starting location by a random small amount (up to ~500 meters)
       const startLocation = {
         lat: baseLocation.lat + (Math.random() - 0.5) * 0.005,
         lng: baseLocation.lng + (Math.random() - 0.5) * 0.005,
@@ -189,9 +256,9 @@ export function useLocation(): LocationState {
       let currentLng = startLocation.lng;
       let step = 0;
       
-      const turnRate = 3 + Math.random() * 5; // 3 to 8 degrees per second. Completes circle in 45-120 seconds.
+      const turnRate = 3 + Math.random() * 5;
       const randomBaseAngle = Math.random() * Math.PI * 2;
-      const speed = 0.00003 + Math.random() * 0.00002; // vary speed
+      const speed = 0.00003 + Math.random() * 0.00002;
       
       if (simulationIntervalRef.current) clearInterval(simulationIntervalRef.current);
       
@@ -203,10 +270,9 @@ export function useLocation(): LocationState {
         }
 
         if (isPausedRef.current) {
-          return; // Skip updating trail and location if paused
+          return;
         }
         
-        // Move in a rough circle/polygon (velocity vector rotates)
         const angle = (step * turnRate) * (Math.PI / 180) + randomBaseAngle;
         
         currentLat += Math.cos(angle) * speed + (Math.random() - 0.5) * 0.000005;
@@ -233,7 +299,7 @@ export function useLocation(): LocationState {
         startTime: Date.now(),
         elapsedTime: 0,
         trail: [{ ...startLocation, timestamp: Date.now() }],
-        error: null, // Clear any GPU/GPS errors since we're forcing simulation
+        error: null,
       };
     });
   }, []);

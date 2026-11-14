@@ -1,5 +1,6 @@
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import { screen } from '@testing-library/dom';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { ProfileCard } from './ProfileCard';
 import { getLocalDateString } from '../../lib/streak';

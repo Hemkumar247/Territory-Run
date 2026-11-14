@@ -1,10 +1,10 @@
 {
-  "installCommand": "cd Territory-Run && npm install --legacy-peer-deps",
-  "buildCommand": "cd Territory-Run && npm run build",
-  "outputDirectory": "Territory-Run/dist",
+  "installCommand": "npm install --legacy-peer-deps",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
   "functions": {
     "api/tactician.ts": {
-      "includeFiles": "Territory-Run/firebase-applet-config.json"
+      "includeFiles": "firebase-applet-config.json"
     }
   },
   "framework": "vite",

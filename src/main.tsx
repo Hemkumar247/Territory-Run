@@ -6,6 +6,7 @@ import { initGA } from './lib/analytics';
 import { Capacitor } from '@capacitor/core';
 import { registerSW } from 'virtual:pwa-register';
 import App from './App.tsx';
+import Demo from './Demo.tsx';
 import './index.css';
 
 // PROBLEM: How can AI help users stay motivated in their health and wellness journey through gamification and territory optimization?
@@ -36,8 +37,12 @@ if ((import.meta as any).env?.MODE === 'production') {
 
 if (!Capacitor.isNativePlatform()) registerSW({ immediate: true });
 
+// Check if demo mode
+const urlParams = new URLSearchParams(window.location.search);
+const isDemo = urlParams.get('demo') === '1';
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    {isDemo ? <Demo /> : <App />}
   </StrictMode>,
 );

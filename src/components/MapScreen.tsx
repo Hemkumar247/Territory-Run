@@ -9,8 +9,8 @@ import { logout } from '../services/authService';
 import { saveRunSession } from '../services/runService';
 import { getTacticalAdvice } from '../services/aiTactician';
 import { Leaderboard } from './Leaderboard';
-import { WelcomeModal } from './WelcomeModal';
-import { OnboardingTutorial } from './OnboardingTutorial';
+import { WelcomeScreen } from './WelcomeScreen';
+import { OnboardingScreen } from './OnboardingScreen'; // New GoRun-inspired onboarding
 import * as turf from '@turf/turf';
 import { calculateDecayedStrength, getStrengthLevel, escapeHtml, TerritorySpatialHash } from '../lib/utils';
 import { MAP_TILE_ATTRIBUTION, MAP_TILE_URL } from '../lib/mapTiles';
@@ -1270,9 +1270,9 @@ export function MapScreen() {
       {/* Welcome Modal / Onboarding */}
       {showWelcome && userProfile && (
         (forceTutorial || (userProfile.totalRuns === 0 && userProfile.totalDistance === 0)) ? (
-          <OnboardingTutorial onComplete={() => { handleCloseWelcome(); setForceTutorial(false); }} />
+          <OnboardingScreen onComplete={() => { handleCloseWelcome(); setForceTutorial(false); }} />
         ) : (
-          <WelcomeModal user={userProfile} onClose={handleCloseWelcome} />
+          <WelcomeScreen user={userProfile} onClose={handleCloseWelcome} />
         )
       )}
     </main>
